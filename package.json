@@ -1,0 +1,28 @@
+{
+  "name": "precious",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Precious - One key to rule them all. Every LLM. Your keys. Our router.",
+  "workspaces": [
+    "packages/*",
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@precious/server & npm run dev --workspace=@precious/web",
+    "dev:server": "npm run dev --workspace=@precious/server",
+    "dev:web": "npm run dev --workspace=@precious/web",
+    "build": "npm run build --workspaces --if-present",
+    "build:core": "npm run build --workspace=@precious/core",
+    "build:providers": "npm run build --workspace=@precious/providers",
+    "build:server": "npm run build --workspace=@precious/server",
+    "build:web": "npm run build --workspace=@precious/web",
+    "start:local": "npm run start --workspace=@precious/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspace=@precious/core"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

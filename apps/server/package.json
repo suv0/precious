@@ -1,0 +1,31 @@
+{
+  "name": "@precious/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@precious/core": "*",
+    "@precious/providers": "*",
+    "bcryptjs": "^2.4.3",
+    "@libsql/client": "^0.14.0",
+    "drizzle-orm": "^0.38.2",
+    "hono": "^4.6.14",
+    "uuid": "^11.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.0",
+    "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

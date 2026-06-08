@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+
+:root {
+  --precious-emerald: #0d3b2e;
+  --precious-gold: #d4a853;
+  --precious-bg: #0a1612;
+  --precious-surface: #112820;
+  --precious-text: #e8f0ec;
+  --precious-muted: #8aab9a;
+}
+
+.font-display {
+  font-family: 'Cinzel', serif;
+}
+
+.gold-glow {
+  text-shadow: 0 0 20px rgba(212, 168, 83, 0.4);
+}
+
+.precious-card {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(6, 78, 59, 0.6);
+  background: rgba(17, 40, 32, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.precious-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  background: linear-gradient(to right, #047857, #059669);
+  color: white;
+}
+
+.precious-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 500;
+  border: 1px solid rgba(212, 168, 83, 0.5);
+  color: var(--precious-gold);
+}
+
+.precious-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(6, 78, 59, 0.6);
+  background: rgba(10, 22, 18, 0.8);
+  padding: 0.625rem 1rem;
+  color: var(--precious-text);
+}
+
+.risk-low { background: rgba(6, 78, 59, 0.5); color: #6ee7b7; border: 1px solid #047857; }
+.risk-medium { background: rgba(120, 53, 15, 0.4); color: #fcd34d; border: 1px solid #b45309; }
+.risk-high { background: rgba(127, 29, 29, 0.4); color: #fca5a5; border: 1px solid #b91c1c; }

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { eq } from 'drizzle-orm';
 import { getDb } from '../db/index.js';
 import { users, settings } from '../db/schema.js';
 
@@ -26,11 +27,28 @@ export async function getOrCreateLocalUserId(): Promise<string> {
   await db.insert(settings).values({
     userId,
     tosAcknowledged: false,
+    cloudTrustAcknowledged: false,
   });
 
   return userId;
 }
 
 export async function ensureLocalUser(): Promise<string> {
-  return getOrCreateLocalUserId();
+  const userId = await getOrCreateLocalUserId();
+  const db = getDb();
+  const [existingSettings] = await db
+    .select({ userId: settings.userId })
+    .from(settings)
+    .where(eq(settings.userId, userId))
+    .limit(1);
+
+  if (!existingSettings) {
+    await db.insert(settings).values({
+      userId,
+      tosAcknowledged: false,
+      cloudTrustAcknowledged: false,
+    });
+  }
+
+  return userId;
 }

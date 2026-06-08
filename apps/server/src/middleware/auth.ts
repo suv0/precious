@@ -53,8 +53,13 @@ export async function optionalSessionAuth(c: Context, next: Next) {
 
 /**
  * Local API auth: no login by default; optional PRECIOUS_LOCAL_PASSWORD protection.
+ * Cloud mode (PRECIOUS_CLOUD_MODE=1): always requires valid session cookie.
  */
 export async function localApiAuth(c: Context, next: Next) {
+  if (process.env.PRECIOUS_CLOUD_MODE === '1') {
+    return sessionAuth(c, next);
+  }
+
   if (!isLocalPasswordEnabled()) {
     const userId = await getOrCreateLocalUserId();
     c.set('userId', userId);

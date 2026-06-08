@@ -10,6 +10,34 @@ import { localApiAuth, type AppVariables } from '../middleware/auth.js';
 
 const keys = new Hono<{ Variables: AppVariables }>();
 
+async function ensureUserSettings(userId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select({ userId: settings.userId })
+    .from(settings)
+    .where(eq(settings.userId, userId))
+    .limit(1);
+
+  if (!row) {
+    await db.insert(settings).values({
+      userId,
+      tosAcknowledged: false,
+      cloudTrustAcknowledged: false,
+    });
+  }
+}
+
+async function patchUserSettings(
+  userId: string,
+  patch: { tosAcknowledged?: boolean; cloudTrustAcknowledged?: boolean },
+) {
+  await ensureUserSettings(userId);
+  const db = getDb();
+  if (Object.keys(patch).length > 0) {
+    await db.update(settings).set(patch).where(eq(settings.userId, userId));
+  }
+}
+
 keys.use('*', localApiAuth);
 
 keys.get('/providers', (c) => {
@@ -25,6 +53,7 @@ keys.get('/', async (c) => {
       providerId: providerKeys.providerId,
       label: providerKeys.label,
       customBaseUrl: providerKeys.customBaseUrl,
+      healthStatus: providerKeys.healthStatus,
       createdAt: providerKeys.createdAt,
     })
     .from(providerKeys)
@@ -48,6 +77,7 @@ keys.post('/', async (c) => {
     apiKey: string;
     customBaseUrl?: string;
     tosAcknowledged?: boolean;
+    cloudTrustAcknowledged?: boolean;
   }>();
 
   if (!body.providerId || !body.label || !body.apiKey) {
@@ -69,17 +99,34 @@ keys.post('/', async (c) => {
     return c.json(
       {
         error: 'Terms of Service acknowledgment required before adding keys',
+        code: 'tos_required',
         tosRequired: true,
       },
       403,
     );
   }
 
+  if (
+    process.env.PRECIOUS_CLOUD_MODE === '1' &&
+    !userSettings?.cloudTrustAcknowledged &&
+    !body.cloudTrustAcknowledged
+  ) {
+    return c.json(
+      {
+        error: 'Cloud trust acknowledgment required before adding keys',
+        code: 'cloud_trust_required',
+        cloudTrustRequired: true,
+      },
+      403,
+    );
+  }
+
   if (body.tosAcknowledged) {
-    await db
-      .update(settings)
-      .set({ tosAcknowledged: true })
-      .where(eq(settings.userId, userId));
+    await patchUserSettings(userId, { tosAcknowledged: true });
+  }
+
+  if (body.cloudTrustAcknowledged) {
+    await patchUserSettings(userId, { cloudTrustAcknowledged: true });
   }
 
   const id = uuidv4();
@@ -91,7 +138,8 @@ keys.post('/', async (c) => {
     providerId: body.providerId,
     label: body.label,
     encryptedKey,
-    customBaseUrl: body.customBaseUrl ?? null,
+    customBaseUrl: body.customBaseUrl?.trim() || null,
+    healthStatus: 'unknown',
     createdAt: new Date(),
   });
 
@@ -162,6 +210,23 @@ keys.get('/unified', async (c) => {
 keys.post('/unified', async (c) => {
   const userId = c.get('userId');
   const db = getDb();
+
+  const [providerKey] = await db
+    .select({ id: providerKeys.id })
+    .from(providerKeys)
+    .where(eq(providerKeys.userId, userId))
+    .limit(1);
+
+  if (!providerKey) {
+    return c.json(
+      {
+        error: 'Add at least one provider key before generating a unified key.',
+        code: 'no_provider_keys',
+      },
+      400,
+    );
+  }
+
   const { key, prefix, hash } = generateUnifiedApiKey();
   const id = uuidv4();
 
@@ -182,12 +247,21 @@ keys.post('/unified', async (c) => {
   return c.json({
     key,
     prefix,
-    message: 'Save this key now — it will not be shown again.',
+    message: 'Your prec_ key is forged. Guard it — you only see it once.',
   });
+});
+
+keys.get('/usage', async (c) => {
+  const userId = c.get('userId');
+  const db = getDb();
+  const { getUsageSummaryForUser } = await import('../lib/usage-summary.js');
+  const summary = await getUsageSummaryForUser(db, userId);
+  return c.json(summary);
 });
 
 keys.get('/settings', async (c) => {
   const userId = c.get('userId');
+  await ensureUserSettings(userId);
   const db = getDb();
   const [row] = await db
     .select()
@@ -197,7 +271,35 @@ keys.get('/settings', async (c) => {
 
   return c.json({
     tosAcknowledged: row?.tosAcknowledged ?? false,
+    cloudTrustAcknowledged: row?.cloudTrustAcknowledged ?? false,
   });
+});
+
+keys.post('/health-check', async (c) => {
+  const userId = c.get('userId');
+  const db = getDb();
+  const encryptionKey = process.env.ENCRYPTION_KEY!;
+  const { probeAllUserKeys } = await import('../services/health.js');
+  await probeAllUserKeys(db, userId, encryptionKey);
+
+  const rows = await db
+    .select({
+      id: providerKeys.id,
+      providerId: providerKeys.providerId,
+      label: providerKeys.label,
+      customBaseUrl: providerKeys.customBaseUrl,
+      healthStatus: providerKeys.healthStatus,
+      createdAt: providerKeys.createdAt,
+    })
+    .from(providerKeys)
+    .where(eq(providerKeys.userId, userId));
+
+  const enriched = rows.map((row) => ({
+    ...row,
+    meta: getProviderMeta(row.providerId),
+  }));
+
+  return c.json({ keys: enriched });
 });
 
 export { keys };

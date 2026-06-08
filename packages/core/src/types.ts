@@ -13,6 +13,9 @@ export interface ProviderMeta {
   riskLevel: RiskLevel;
   cloudSafe: boolean;
   defaultBaseUrl?: string;
+  /** Where to create an API key for this provider */
+  keySetupUrl?: string;
+  keySetupHint?: string;
 }
 
 export interface ChatMessage {
@@ -89,12 +92,20 @@ export interface ProviderKeyRecord {
   customBaseUrl?: string | null;
 }
 
+export const AUTO_MODEL = 'auto';
+
+export interface KeyAvailabilityCheck {
+  (providerId: ProviderId, model: string, keyId: string): boolean;
+}
+
 export interface RouterContext {
   userId: string;
   fallbackChain: FallbackChainEntry[];
   providerKeys: ProviderKeyRecord[];
   decryptKey: (encrypted: string) => string;
   maxAttempts?: number;
+  /** Skip keys that are over RPM/RPD caps or marked unhealthy */
+  isKeyAvailable?: KeyAvailabilityCheck;
 }
 
 export interface RateLimitConfig {

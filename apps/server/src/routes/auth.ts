@@ -88,4 +88,21 @@ auth.post('/logout', sessionAuth, async (c) => {
   return c.json({ ok: true });
 });
 
+/** Cloud only — delete account and all data (cascade) */
+auth.delete('/account', sessionAuth, async (c) => {
+  if (process.env.PRECIOUS_CLOUD_MODE !== '1') {
+    return c.json({ error: 'Account deletion is only available in cloud mode' }, 404);
+  }
+
+  const userId = c.get('userId');
+  const db = getDb();
+  const { users } = await import('../db/schema.js');
+
+  await logAudit(db, userId, 'login', { metadata: { action: 'account_delete' } });
+  await db.delete(users).where(eq(users.id, userId));
+
+  deleteCookie(c, SESSION_COOKIE, { path: '/' });
+  return c.json({ ok: true, message: 'Account and all keys deleted.' });
+});
+
 export { auth };

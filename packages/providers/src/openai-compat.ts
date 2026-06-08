@@ -17,4 +17,6 @@ export const openaiCompatMeta: ProviderMeta = {
   name: 'Custom OpenAI-compatible',
   riskLevel: 'medium',
   cloudSafe: false,
+  keySetupUrl: 'https://github.com/ollama/ollama/blob/main/docs/faq.md',
+  keySetupHint: 'Local Ollama: run ollama serve — use http://localhost:11434/v1 and key "ollama".',
 };

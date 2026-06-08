@@ -18,12 +18,16 @@ export async function loadChatMessages(userId: string): Promise<ChatMessage[]> {
   }));
 }
 
-/** Prefer the longer history; DB fills gaps when the client sends only the latest turn. */
+/**
+ * useChat sends the full thread the user sees — that list is authoritative.
+ * Old server-side merge kept stale DB history when the client had fewer messages
+ * (e.g. after refresh), which caused replies unrelated to what was on screen.
+ */
 export function mergeChatMessages(
   stored: ChatMessage[],
   incoming: ChatMessage[],
 ): ChatMessage[] {
-  if (incoming.length >= stored.length) return incoming;
+  if (incoming.length > 0) return incoming;
   return stored;
 }
 
@@ -45,4 +49,9 @@ export async function saveChatMessages(
       createdAt: new Date(now + i),
     });
   }
+}
+
+export async function clearChatMessages(userId: string): Promise<void> {
+  const db = getDb();
+  await db.delete(chatMessages).where(eq(chatMessages.userId, userId));
 }

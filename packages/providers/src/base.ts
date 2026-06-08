@@ -52,9 +52,29 @@ export function buildOpenAIRequestBody(
 export async function parseOpenAIResponse(res: Response): Promise<ChatCompletionResponse> {
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Provider error ${res.status}: ${text.slice(0, 500)}`);
+    throw providerHttpError(res.status, text);
   }
   return (await res.json()) as ChatCompletionResponse;
+}
+
+export function providerHttpError(status: number, body: string, providerName?: string): Error {
+  const prefix = providerName ? `${providerName} error ${status}` : `Provider error ${status}`;
+  if (status === 429) {
+    return new Error(`${prefix}: rate limit or quota exceeded.`);
+  }
+  const short = extractErrorMessage(body);
+  return new Error(`${prefix}: ${short}`);
+}
+
+function extractErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string }; message?: string };
+    const msg = parsed.error?.message ?? parsed.message;
+    if (msg) return msg.length > 200 ? `${msg.slice(0, 197)}…` : msg;
+  } catch {
+    /* plain text */
+  }
+  return body.length > 200 ? `${body.slice(0, 197)}…` : body;
 }
 
 export async function* streamOpenAIResponse(
@@ -64,7 +84,7 @@ export async function* streamOpenAIResponse(
 ): AsyncGenerator<string, void, unknown> {
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Provider error ${res.status}: ${text.slice(0, 500)}`);
+    throw providerHttpError(res.status, text, 'Provider');
   }
 
   const reader = res.body?.getReader();
@@ -98,6 +118,14 @@ export async function* streamOpenAIResponse(
   }
 }
 
+export function resolveProviderBaseUrl(
+  baseUrl: string | null | undefined,
+  defaultBaseUrl: string,
+): string {
+  const trimmed = baseUrl?.trim();
+  return (trimmed || defaultBaseUrl).replace(/\/$/, '');
+}
+
 export function createOpenAICompatAdapter(
   config: ProviderConfig,
 ): ProviderAdapter {
@@ -105,7 +133,7 @@ export function createOpenAICompatAdapter(
     id: config.id,
 
     async chatCompletion(apiKey, model, request, baseUrl) {
-      const url = `${baseUrl ?? config.defaultBaseUrl}/chat/completions`;
+      const url = `${resolveProviderBaseUrl(baseUrl, config.defaultBaseUrl)}/chat/completions`;
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: {
@@ -120,7 +148,7 @@ export function createOpenAICompatAdapter(
     },
 
     async *streamChatCompletion(apiKey, model, request, baseUrl) {
-      const url = `${baseUrl ?? config.defaultBaseUrl}/chat/completions`;
+      const url = `${resolveProviderBaseUrl(baseUrl, config.defaultBaseUrl)}/chat/completions`;
       const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: {

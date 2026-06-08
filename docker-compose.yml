@@ -12,6 +12,7 @@ services:
       - NODE_ENV=production
       - DATA_DIR=/data
       - DATABASE_PATH=/data/precious.db
+      - WEB_DIST=/app/apps/web/out
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]

@@ -9,15 +9,19 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=@precious/server & npm run dev --workspace=@precious/web",
+    "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev --workspace=@precious/server",
     "dev:web": "npm run dev --workspace=@precious/web",
     "build": "npm run build --workspaces --if-present",
     "build:core": "npm run build --workspace=@precious/core",
+    "build:db": "npm run build --workspace=@precious/db",
     "build:providers": "npm run build --workspace=@precious/providers",
+    "build:panel": "npm run typecheck --workspace=@precious/panel",
     "build:server": "npm run build --workspace=@precious/server",
     "build:web": "npm run build --workspace=@precious/web",
     "start:local": "npm run start --workspace=@precious/server",
+    "smoke": "node scripts/smoke-local.mjs",
+    "smoke:full": "npm run build:server && node scripts/smoke-local.mjs --start",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspace=@precious/core"
   },

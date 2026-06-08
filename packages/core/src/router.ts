@@ -84,7 +84,7 @@ export class Router {
     pinnedModel?: string,
   ): FallbackChainEntry[] {
     const ordered = this.getOrderedChain(chain);
-    if (!pinnedModel) return ordered;
+    if (!pinnedModel || pinnedModel === 'auto') return ordered;
 
     const pinnedIdx = ordered.findIndex((e) => e.model === pinnedModel);
     if (pinnedIdx < 0) return ordered;
@@ -134,6 +134,9 @@ export class Router {
         const model = entry.model;
         const cdKey = this.cooldownKey(entry.providerId, model, keyRecord.id);
         if (this.isOnCooldown(cdKey, now)) continue;
+        if (ctx.isKeyAvailable && !ctx.isKeyAvailable(entry.providerId, model, keyRecord.id)) {
+          continue;
+        }
 
         while (attempts < maxAttempts) {
           attempts += 1;

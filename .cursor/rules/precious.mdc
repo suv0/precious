@@ -1,0 +1,14 @@
+---
+description: Precious project conventions — read AGENTS.md first
+alwaysApply: true
+---
+
+# Precious
+
+Read [AGENTS.md](../AGENTS.md) before making changes.
+
+- Engine (`packages/core`, `packages/providers`) → public repo only
+- Panel UI → `packages/panel` (shared MIT)
+- Marketing/auth → `precious-cloud/apps/web` only (proprietary)
+- Local = no login; Cloud = multi-tenant auth required
+- Failover must preserve full message context

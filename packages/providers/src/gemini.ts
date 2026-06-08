@@ -4,7 +4,7 @@ import type {
   ProviderMeta,
 } from '@precious/core';
 import type { ProviderAdapter } from '@precious/core';
-import { fetchWithTimeout } from './base.js';
+import { fetchWithTimeout, resolveProviderBaseUrl, providerHttpError } from './base.js';
 
 export const geminiConfig = {
   id: 'google-gemini' as const,
@@ -12,18 +12,18 @@ export const geminiConfig = {
   riskLevel: 'medium' as const,
   cloudSafe: true,
   defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-  defaultModels: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+  defaultModels: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
 };
 
-function geminiUrl(baseUrl: string): string {
-  return `${baseUrl}/chat/completions`;
+function geminiUrl(baseUrl: string | null | undefined): string {
+  return `${resolveProviderBaseUrl(baseUrl, geminiConfig.defaultBaseUrl)}/chat/completions`;
 }
 
 export const geminiAdapter: ProviderAdapter = {
   id: 'google-gemini',
 
   async chatCompletion(apiKey, model, request, baseUrl) {
-    const url = geminiUrl(baseUrl ?? geminiConfig.defaultBaseUrl);
+    const url = geminiUrl(baseUrl);
     const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
@@ -34,7 +34,7 @@ export const geminiAdapter: ProviderAdapter = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Gemini error ${res.status}: ${text.slice(0, 500)}`);
+      throw providerHttpError(res.status, text, 'Gemini');
     }
     const response = (await res.json()) as ChatCompletionResponse;
     response.precious = { provider: 'google-gemini', model, attempts: 1 };
@@ -42,7 +42,7 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async *streamChatCompletion(apiKey, model, request, baseUrl) {
-    const url = geminiUrl(baseUrl ?? geminiConfig.defaultBaseUrl);
+    const url = geminiUrl(baseUrl);
     const res = await fetchWithTimeout(url, {
       method: 'POST',
       headers: {
@@ -53,7 +53,7 @@ export const geminiAdapter: ProviderAdapter = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Gemini error ${res.status}: ${text.slice(0, 500)}`);
+      throw providerHttpError(res.status, text, 'Gemini');
     }
 
     const reader = res.body?.getReader();
@@ -108,4 +108,6 @@ export const geminiMeta: ProviderMeta = {
   riskLevel: 'medium',
   cloudSafe: true,
   defaultBaseUrl: geminiConfig.defaultBaseUrl,
+  keySetupUrl: 'https://aistudio.google.com/apikey',
+  keySetupHint: 'Google AI Studio → Get API key → Create. Free tier available.',
 };

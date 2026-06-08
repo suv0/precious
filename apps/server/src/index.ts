@@ -1,23 +1,24 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateEncryptionKey } from '@precious/core';
 import { initDb } from './db/index.js';
 import { ensureLocalUser } from './lib/local-user.js';
-import { auth } from './routes/auth.js';
-import { keys } from './routes/keys.js';
-import { fallback } from './routes/fallback.js';
-import { v1, chatSession } from './routes/chat.js';
+import { createPreciousApp } from './create-app.js';
+import { findAvailablePort } from './lib/find-port.js';
+
+function getDefaultWebDist(): string {
+  return process.env.WEB_DIST ?? join(process.cwd(), '..', 'web', 'out');
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT ?? 3001);
+const PREFERRED_PORT = Number(process.env.PORT ?? 3001);
 const DATA_DIR = process.env.DATA_DIR ?? join(process.cwd(), 'data');
 const DB_PATH = process.env.DATABASE_PATH ?? join(DATA_DIR, 'precious.db');
-const WEB_DIST = process.env.WEB_DIST ?? join(process.cwd(), '..', 'web', 'out');
+const WEB_DIST = getDefaultWebDist();
+const DEV_PORT_FILE = join(DATA_DIR, '.dev-port');
 
 function ensureEnv() {
   const envPath = join(DATA_DIR, '.env.local');
@@ -44,45 +45,47 @@ function ensureEnv() {
   }
 }
 
+async function resolveListenPort(): Promise<number> {
+  const strict = process.env.PRECIOUS_STRICT_PORT === '1';
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (strict || !isDev) {
+    return PREFERRED_PORT;
+  }
+
+  const port = await findAvailablePort(PREFERRED_PORT);
+  if (port !== PREFERRED_PORT) {
+    console.log(`Port ${PREFERRED_PORT} in use — using ${port} instead`);
+  }
+  return port;
+}
+
 async function main() {
   ensureEnv();
-  initDb(DB_PATH);
+  await initDb(DB_PATH);
   await ensureLocalUser();
 
-  const app = new Hono();
+  const port = await resolveListenPort();
+  if (process.env.NODE_ENV !== 'production') {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(DEV_PORT_FILE, String(port), 'utf8');
+  }
 
-  app.use(
-    '*',
-    cors({
-      origin: [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        process.env.WEB_ORIGIN ?? '',
-      ].filter(Boolean),
-      credentials: true,
-    }),
-  );
-
-  app.get('/health', (c) => c.json({ status: 'ok', mode: 'local' }));
-
-  app.route('/api/auth', auth);
-  app.route('/api/keys', keys);
-  app.route('/api/fallback-chain', fallback);
-  app.route('/v1', v1);
-  app.route('/api/chat', chatSession);
+  const app = createPreciousApp({
+    mode: 'local',
+    webDist: WEB_DIST,
+    corsOrigins: [
+      'http://localhost:3000',
+      `http://localhost:${port}`,
+      process.env.WEB_ORIGIN ?? '',
+    ].filter(Boolean),
+  });
 
   if (existsSync(WEB_DIST)) {
     app.use('/*', serveStatic({ root: WEB_DIST }));
     app.get('*', serveStatic({ path: join(WEB_DIST, 'index.html') }));
   } else if (process.env.NODE_ENV !== 'production') {
-    app.get('/', (c) =>
-      c.json({
-        message: 'Precious Local API',
-        tagline: 'One key to rule them all.',
-        web: 'Run npm run dev:web for UI at http://localhost:3000',
-        docs: '/health',
-      }),
-    );
+    app.get('/', (c) => c.redirect('/settings/keys'));
   }
 
   console.log(`
@@ -90,11 +93,11 @@ async function main() {
   ║           💎 Precious Local           ║
   ║   One key to rule them all.           ║
   ╚═══════════════════════════════════════╝
-  API:  http://localhost:${PORT}
+  API + Panel: http://localhost:${port}
   Mode: local (SQLite @ ${DB_PATH})
   `);
 
-  serve({ fetch: app.fetch, port: PORT });
+  serve({ fetch: app.fetch, port });
 }
 
 main().catch(console.error);

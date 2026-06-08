@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import '@precious/panel/styles.css';
+import { LocalPanelProvider } from '@/components/LocalPanelProvider';
 
 export const metadata: Metadata = {
-  title: 'Precious — One key to rule them all',
-  description: 'Every LLM. Your keys. Our router. Cloud or local.',
+  title: 'Precious Local — Keys & Chat',
+  description: 'Self-hosted LLM router panel. Add keys, chat, unified prec_ API key.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LocalPanelProvider>{children}</LocalPanelProvider>
+      </body>
     </html>
   );
 }

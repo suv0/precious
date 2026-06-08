@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./create-app": "./dist/create-app.js",
+    "./db": "./dist/db/index.js"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
@@ -13,6 +17,7 @@
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@precious/core": "*",
+    "@precious/db": "*",
     "@precious/providers": "*",
     "bcryptjs": "^2.4.3",
     "@libsql/client": "^0.14.0",

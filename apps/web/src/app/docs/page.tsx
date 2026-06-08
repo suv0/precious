@@ -16,7 +16,7 @@ const guides = [
     url: 'https://console.groq.com/keys',
   },
   {
-    id: 'gemini',
+    id: 'google-gemini',
     title: 'Google Gemini',
     risk: 'medium' as const,
     steps: [

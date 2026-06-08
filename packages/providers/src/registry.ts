@@ -42,7 +42,7 @@ export function getDefaultModels(providerId: string): string[] {
     case 'groq':
       return ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
     case 'google-gemini':
-      return ['gemini-2.0-flash', 'gemini-1.5-flash'];
+      return ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
     case 'openrouter':
       return ['meta-llama/llama-3.3-70b-instruct:free'];
     case 'mistral':

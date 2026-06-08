@@ -135,4 +135,40 @@ describe('Router failover', () => {
 
     assert.deepEqual(modelsUsed, ['llama-groq', 'mistral-small']);
   });
+
+  it('model auto walks full fallback chain from the start', async () => {
+    const order: ProviderId[] = [];
+
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        order.push('groq');
+        return okResponse('groq', 'llama-groq');
+      }),
+      streamChatCompletion: async function* () {
+        yield '';
+      },
+    };
+
+    const mistralAdapter = {
+      id: 'mistral' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        order.push('mistral');
+        return okResponse('mistral', 'mistral-small');
+      }),
+      streamChatCompletion: async function* () {
+        yield '';
+      },
+    };
+
+    const router = new Router([groqAdapter, mistralAdapter]);
+    const result = await router.route(
+      makeContext(),
+      { model: 'auto', messages: FULL_MESSAGES },
+      false,
+    );
+
+    assert.equal(result.provider, 'groq');
+    assert.deepEqual(order, ['groq']);
+  });
 });

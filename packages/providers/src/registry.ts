@@ -76,7 +76,7 @@ export function getProviderMeta(id: string): ProviderMeta | undefined {
   return ALL_PROVIDERS.find((p) => p.id === id);
 }
 
-export { modelSupportsAttachments } from './vision.js';
+export { modelSupportsAttachments, getModelAttachmentCapabilities } from './attachments.js';
 
 export function getDefaultModels(providerId: string): string[] {
   switch (providerId) {

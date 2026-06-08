@@ -6,6 +6,7 @@ out/
 .env.local
 *.db
 /data/
+apps/server/data/.dev-port
 .turbo/
 .wrangler/
 *.log

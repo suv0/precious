@@ -11,10 +11,10 @@ import { apiFetch, AUTO_MODEL } from '../lib/api';
 import { copy, failoverToast as formatFailoverToast } from '../lib/copy';
 import type { ChatResponseMeta } from '../lib/parse-chat-content';
 import {
+  attachmentCapabilitiesForModel,
   dedupeModelOptions,
   formatModelOptionLabel,
   modelSelectValue,
-  modelSupportsAttachments,
   type ChatModelOption,
 } from '../lib/chat-models';
 import { prepareChatRequestBody } from '../lib/prepare-chat-body';
@@ -80,7 +80,14 @@ function ChatPanelInner({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const modelOptions = useMemo(() => dedupeModelOptions(models), [models]);
-  const attachmentsEnabled = modelSupportsAttachments(selectedModel, modelOptions);
+  const attachmentCaps = useMemo(
+    () => attachmentCapabilitiesForModel(selectedModel, modelOptions),
+    [selectedModel, modelOptions],
+  );
+  const attachmentsEnabled = attachmentCaps.any;
+  const attachmentsHint = attachmentsEnabled
+    ? undefined
+    : `Text-only — pick a 📎 model for images/files`;
 
   const chatApi = apiBase ? `${apiBase}/api/chat/completions` : '/api/chat/completions';
 
@@ -158,7 +165,13 @@ function ChatPanelInner({
     });
   };
 
-  const composerPlaceholder = 'Ask anything…';
+  const composerPlaceholder = attachmentsEnabled
+    ? attachmentCaps.images && attachmentCaps.documents
+      ? 'Ask anything… attach images or files with 📎'
+      : attachmentCaps.images
+        ? 'Ask anything… attach images with 📎 or Ctrl+V'
+        : 'Ask anything… attach CSV, PDF, or text files with 📎'
+    : 'Ask anything…';
 
   return (
     <>
@@ -202,6 +215,7 @@ function ChatPanelInner({
             role={m.role}
             content={m.content}
             meta={metaForMessage(m)}
+            attachments={m.experimental_attachments}
           />
         ))}
         {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
@@ -246,7 +260,11 @@ function ChatPanelInner({
         onInputChange={handleInputChange}
         onSubmit={onComposerSubmit}
         isLoading={isLoading}
-        attachmentsEnabled={attachmentsEnabled}
+        attachmentCapabilities={{
+          images: attachmentCaps.images,
+          documents: attachmentCaps.documents,
+        }}
+        attachmentsHint={attachmentsHint}
         placeholder={composerPlaceholder}
       />
     </>

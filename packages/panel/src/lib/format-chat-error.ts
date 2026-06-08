@@ -127,6 +127,16 @@ export function formatChatError(raw: string): ChatErrorDisplay {
     };
   }
 
+  if (lower.includes('messages required')) {
+    return {
+      title: 'Message did not reach the server',
+      lines: [
+        'The chat request was sent without any messages — usually a temporary UI bug.',
+        'Click Retry last message, or send again.',
+      ],
+    };
+  }
+
   return {
     title: 'Could not get a reply',
     lines: [shortenProviderDetail(message)],

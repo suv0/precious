@@ -1,10 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  acceptAttributeForCapabilities,
+  attachmentKindLabel,
+  fileAllowedForCapabilities,
+  isImageFile,
+  type AttachmentCapabilities,
+} from '../lib/attachment-files';
 
 export interface PendingAttachment {
   file: File;
   previewUrl: string;
+  kind: string;
 }
 
 interface ChatComposerProps {
@@ -12,7 +20,8 @@ interface ChatComposerProps {
   onInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: (attachments: File[]) => void;
   isLoading: boolean;
-  attachmentsEnabled: boolean;
+  attachmentCapabilities: AttachmentCapabilities;
+  attachmentsHint?: string;
   placeholder?: string;
 }
 
@@ -21,11 +30,16 @@ export function ChatComposer({
   onInputChange,
   onSubmit,
   isLoading,
-  attachmentsEnabled,
+  attachmentCapabilities,
+  attachmentsHint,
   placeholder = 'Ask anything…',
 }: ChatComposerProps) {
+  const attachmentsEnabled =
+    attachmentCapabilities.images || attachmentCapabilities.documents;
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [rejectHint, setRejectHint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -50,10 +64,22 @@ export function ChatComposer({
 
   const addFiles = (files: FileList | File[] | null) => {
     if (!files?.length) return;
+    setRejectHint(null);
     const next: PendingAttachment[] = [];
+    let rejected = 0;
     for (const file of Array.from(files)) {
-      if (!file.type.startsWith('image/')) continue;
-      next.push({ file, previewUrl: URL.createObjectURL(file) });
+      if (!fileAllowedForCapabilities(file, attachmentCapabilities)) {
+        rejected += 1;
+        continue;
+      }
+      next.push({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        kind: attachmentKindLabel(file),
+      });
+    }
+    if (rejected > 0) {
+      setRejectHint('That file type is not supported for this model.');
     }
     if (next.length) setPending((prev) => [...prev, ...next]);
   };
@@ -69,6 +95,7 @@ export function ChatComposer({
 
   const pasteScreenshot = async () => {
     setMenuOpen(false);
+    if (!attachmentCapabilities.images) return;
     try {
       const items = await navigator.clipboard.read();
       for (const item of items) {
@@ -88,7 +115,21 @@ export function ChatComposer({
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (!attachmentsEnabled) return;
+    if (!attachmentsEnabled) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          setRejectHint(
+            attachmentsHint ??
+              'This model cannot receive images — switch to a model with 📎 (e.g. Gemini).',
+          );
+          break;
+        }
+      }
+      return;
+    }
+    if (!attachmentCapabilities.images) return;
     const items = e.clipboardData?.items;
     if (!items) return;
     const imageFiles: File[] = [];
@@ -122,6 +163,16 @@ export function ChatComposer({
   };
 
   const canSend = !isLoading && (input.trim().length > 0 || pending.length > 0);
+  const acceptAttr = acceptAttributeForCapabilities(attachmentCapabilities);
+
+  const attachHelp =
+    attachmentCapabilities.images && attachmentCapabilities.documents
+      ? '📎 images, CSV, PDF, text files'
+      : attachmentCapabilities.images
+        ? '📎 images & screenshots'
+        : attachmentCapabilities.documents
+          ? '📎 CSV, PDF, text files'
+          : '';
 
   return (
     <div className="space-y-2 shrink-0">
@@ -130,9 +181,18 @@ export function ChatComposer({
           {pending.map((p, i) => (
             <li
               key={p.previewUrl}
-              className="relative group rounded-lg border border-emerald-900/50 overflow-hidden w-14 h-14"
+              className="relative group rounded-lg border border-emerald-900/50 overflow-hidden"
             >
-              <img src={p.previewUrl} alt="" className="w-full h-full object-cover" />
+              {isImageFile(p.file) ? (
+                <div className="w-14 h-14">
+                  <img src={p.previewUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="px-3 py-2 max-w-[10rem] bg-precious-bg/80">
+                  <p className="text-[10px] uppercase text-precious-muted">{p.kind}</p>
+                  <p className="text-xs text-precious-text truncate">{p.file.name}</p>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => removeAttachment(i)}
@@ -146,60 +206,66 @@ export function ChatComposer({
         </ul>
       )}
 
-      <form ref={formRef} onSubmit={handleFormSubmit} className="flex gap-2 items-end">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            addFiles(e.target.files);
-            setMenuOpen(false);
-          }}
-        />
+      {rejectHint && <p className="text-[11px] text-amber-300/90">{rejectHint}</p>}
 
+      <form ref={formRef} onSubmit={handleFormSubmit} className="flex gap-2 items-end">
         {attachmentsEnabled && (
-          <div className="relative shrink-0" ref={menuRef}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              disabled={isLoading}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-900/60 bg-precious-bg/80 text-precious-muted hover:text-precious-gold hover:border-emerald-700/60 transition-colors text-lg leading-none"
-              aria-label="Add attachment"
-              aria-expanded={menuOpen}
-            >
-              +
-            </button>
-            {menuOpen && (
-              <div
-                className="absolute bottom-full left-0 mb-1 min-w-[10.5rem] rounded-lg border border-emerald-900/60 bg-precious-surface shadow-lg py-1 z-20"
-                role="menu"
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={acceptAttr}
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                setMenuOpen(false);
+              }}
+            />
+
+            <div className="relative shrink-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                disabled={isLoading}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-900/60 bg-precious-bg/80 text-precious-muted hover:text-precious-gold hover:border-emerald-700/60 transition-colors text-base leading-none"
+                aria-label="Attach file or image"
+                aria-expanded={menuOpen}
+                title="Attach file or image"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                  }}
+                📎
+              </button>
+              {menuOpen && (
+                <div
+                  className="absolute bottom-full left-0 mb-1 min-w-[11rem] rounded-lg border border-emerald-900/60 bg-precious-surface shadow-lg py-1 z-20"
+                  role="menu"
                 >
-                  Upload image…
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
-                  onClick={pasteScreenshot}
-                >
-                  Paste screenshot
-                </button>
-                <p className="px-3 py-1.5 text-[10px] text-precious-muted border-t border-emerald-900/40">
-                  Or Ctrl+V in the box
-                </p>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {attachmentCapabilities.documents ? 'Upload file…' : 'Upload image…'}
+                  </button>
+                  {attachmentCapabilities.images && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
+                      onClick={pasteScreenshot}
+                    >
+                      Paste screenshot
+                    </button>
+                  )}
+                  <p className="px-3 py-1.5 text-[10px] text-precious-muted border-t border-emerald-900/40 leading-relaxed">
+                    {attachmentCapabilities.images ? 'Ctrl+V for screenshots. ' : ''}
+                    {attachmentCapabilities.documents ? 'CSV, TXT, PDF supported.' : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         <textarea
@@ -223,9 +289,9 @@ export function ChatComposer({
           Send
         </button>
       </form>
-      <p className="text-[10px] text-precious-muted/80">
+      <p className="text-[10px] text-precious-muted/80 leading-relaxed">
         Enter to send · Shift+Enter for new line
-        {attachmentsEnabled ? ' · Ctrl+V to paste images' : ''}
+        {attachmentsEnabled ? ` · ${attachHelp}` : attachmentsHint ? ` · ${attachmentsHint}` : ''}
       </p>
     </div>
   );

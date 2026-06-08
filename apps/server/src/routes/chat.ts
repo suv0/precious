@@ -12,7 +12,7 @@ import {
   type ProviderId,
   type MessageContentPart,
 } from '@precious/core';
-import { getAllAdapters, LOCAL_PROVIDERS, getDefaultModels, modelSupportsAttachments } from '@precious/providers';
+import { getAllAdapters, LOCAL_PROVIDERS, getDefaultModels, getModelAttachmentCapabilities } from '@precious/providers';
 import { getDb } from '../db/index.js';
 import { providerKeys, fallbackChain } from '../db/schema.js';
 import { logAudit } from '../lib/utils.js';
@@ -106,13 +106,18 @@ async function loadUserContext(userId: string) {
 function listModels(ctx: Awaited<ReturnType<typeof loadUserContext>>) {
   const chainModels = ctx.fallbackChain
     .filter((e) => e.enabled)
-    .map((e) => ({
-      id: e.model,
-      object: 'model' as const,
-      owned_by: e.providerId,
-      supports_attachments: modelSupportsAttachments(e.providerId, e.model),
-      precious: LOCAL_PROVIDERS.find((p) => p.id === e.providerId),
-    }));
+    .map((e) => {
+      const caps = getModelAttachmentCapabilities(e.providerId, e.model);
+      return {
+        id: e.model,
+        object: 'model' as const,
+        owned_by: e.providerId,
+        supports_attachments: caps.images || caps.documents,
+        supports_images: caps.images,
+        supports_documents: caps.documents,
+        precious: LOCAL_PROVIDERS.find((p) => p.id === e.providerId),
+      };
+    });
 
   if (chainModels.length === 0) {
     return [
@@ -121,6 +126,8 @@ function listModels(ctx: Awaited<ReturnType<typeof loadUserContext>>) {
         object: 'model' as const,
         owned_by: 'precious',
         supports_attachments: false,
+        supports_images: false,
+        supports_documents: false,
       },
     ];
   }
@@ -140,6 +147,8 @@ function listModels(ctx: Awaited<ReturnType<typeof loadUserContext>>) {
       object: 'model' as const,
       owned_by: 'precious',
       supports_attachments: unique.some((m) => m.supports_attachments),
+      supports_images: unique.some((m) => m.supports_images),
+      supports_documents: unique.some((m) => m.supports_documents),
     },
     ...unique,
   ];

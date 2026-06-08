@@ -17,4 +17,6 @@ export * from './llm7.js';
 export * from './nvidia.js';
 export * from './pollinations.js';
 export * from './kilo.js';
+export * from './attachments.js';
+export * from './vision.js';
 export * from './registry.js';

@@ -1,3 +1,4 @@
+import { isImageFile } from '../lib/attachment-files';
 import {
   formatResponseMeta,
   parseChatContent,
@@ -10,14 +11,20 @@ export function ChatMessageBubble({
   role,
   content,
   meta,
+  attachments,
 }: {
   role: 'user' | 'assistant' | 'system' | 'data';
   content: string;
   meta?: ChatResponseMeta;
+  attachments?: Array<{ url?: string; name?: string; contentType?: string }>;
 }) {
   const isUser = role === 'user';
   const parsed = isUser ? { text: content } : parseChatContent(content);
   const displayMeta = !isUser ? (meta ?? parsed.meta) : undefined;
+  const imageAttachments =
+    attachments?.filter((a) => a.url && isImageFile(a)) ?? [];
+  const fileAttachments =
+    attachments?.filter((a) => a.url && !isImageFile(a)) ?? [];
 
   async function copyText() {
     try {
@@ -43,8 +50,31 @@ export function ChatMessageBubble({
     return (
       <div className="group flex justify-end gap-2 items-end">
         {copyBtn}
-        <div className="max-w-[78%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm bg-emerald-700/50 text-precious-text shadow-sm">
-          <p className="whitespace-pre-wrap break-words leading-relaxed">{parsed.text}</p>
+        <div className="max-w-[78%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm bg-emerald-700/50 text-precious-text shadow-sm space-y-2">
+          {imageAttachments.length > 0 && (
+            <ul className="flex flex-wrap gap-2">
+              {imageAttachments.map((a) => (
+                <li key={a.url} className="rounded-lg overflow-hidden border border-emerald-600/30">
+                  <img src={a.url} alt={a.name ?? 'Attached image'} className="max-h-40 max-w-full object-cover" />
+                </li>
+              ))}
+            </ul>
+          )}
+          {fileAttachments.length > 0 && (
+            <ul className="space-y-1">
+              {fileAttachments.map((a) => (
+                <li
+                  key={a.url}
+                  className="text-xs text-precious-muted bg-emerald-950/40 rounded px-2 py-1 border border-emerald-800/40"
+                >
+                  📄 {a.name ?? 'Attached file'}
+                </li>
+              ))}
+            </ul>
+          )}
+          {parsed.text.trim() ? (
+            <p className="whitespace-pre-wrap break-words leading-relaxed">{parsed.text}</p>
+          ) : null}
         </div>
         <span
           className="shrink-0 w-7 h-7 rounded-full bg-emerald-800/80 border border-emerald-600/30 flex items-center justify-center text-[10px] font-display text-precious-gold"

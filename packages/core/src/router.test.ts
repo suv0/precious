@@ -86,7 +86,7 @@ describe('Router failover', () => {
 
     const router = new Router([groqAdapter, mistralAdapter]);
     const request: ChatCompletionRequest = {
-      model: 'llama-groq',
+      model: 'auto',
       messages: FULL_MESSAGES,
       stream: false,
     };
@@ -129,11 +129,55 @@ describe('Router failover', () => {
     const router = new Router([groqAdapter, mistralAdapter]);
     await router.route(
       makeContext(),
-      { model: 'llama-groq', messages: FULL_MESSAGES },
+      { model: 'auto', messages: FULL_MESSAGES },
       false,
     );
 
     assert.deepEqual(modelsUsed, ['llama-groq', 'mistral-small']);
+  });
+
+  it('pinned provider+model does not failover to other providers', async () => {
+    const providersTried: ProviderId[] = [];
+
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        providersTried.push('groq');
+        throw new RouterError('429 rate limit', true);
+      }),
+      streamChatCompletion: async function* () {
+        yield '';
+      },
+    };
+
+    const mistralAdapter = {
+      id: 'mistral' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        providersTried.push('mistral');
+        return okResponse('mistral', 'mistral-small');
+      }),
+      streamChatCompletion: async function* () {
+        yield '';
+      },
+    };
+
+    const router = new Router([groqAdapter, mistralAdapter]);
+
+    await assert.rejects(
+      () =>
+        router.route(
+          makeContext(),
+          {
+            model: 'llama-groq',
+            providerId: 'groq',
+            messages: FULL_MESSAGES,
+          },
+          false,
+        ),
+      RouterError,
+    );
+
+    assert.deepEqual(providersTried, ['groq']);
   });
 
   it('model auto walks full fallback chain from the start', async () => {

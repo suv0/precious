@@ -14,8 +14,25 @@ export async function loadChatMessages(userId: string): Promise<ChatMessage[]> {
 
   return rows.map((r) => ({
     role: r.role as ChatMessage['role'],
-    content: r.content,
+    content: parseStoredContent(r.content ?? ''),
   }));
+}
+
+function parseStoredContent(raw: string): ChatMessage['content'] {
+  if (raw.startsWith('[')) {
+    try {
+      return JSON.parse(raw) as ChatMessage['content'];
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function serializeContent(content: ChatMessage['content']): string {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  return JSON.stringify(content);
 }
 
 /**
@@ -45,7 +62,7 @@ export async function saveChatMessages(
       id: uuidv4(),
       userId,
       role: msg.role,
-      content: msg.content ?? '',
+      content: serializeContent(msg.content),
       createdAt: new Date(now + i),
     });
   }

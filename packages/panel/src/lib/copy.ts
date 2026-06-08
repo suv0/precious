@@ -12,14 +12,35 @@ export const copy = {
       'The path to the provider is lost — remove and re-add your key, or set a valid base URL for custom providers.',
     generic: 'Something went awry between the Shire and Mordor. Try again.',
     healthCheck: 'The palantír clouded over. Health check failed.',
+    keyTest: 'The test request failed. Try again.',
     addKey: 'The key would not take. Check your fields and try again.',
+  },
+  keys: {
+    allProvidersConfigured:
+      'Every listed provider already has a key. Use Replace on a row below, or Add backup for a second key on the same provider.',
+    backupHint:
+      'Backup keys: if one key hits a rate limit, Precious tries the next key on that provider before switching to another. Separate accounts work best; same-account keys may share quota.',
+    backupTitle: 'Add backup key',
+    ollamaSteps: [
+      'Install Ollama from ollama.com/download (Windows/Mac/Linux). It usually starts automatically.',
+      'Open a terminal and run: ollama pull llama3.2 (or any model name you want to use).',
+      'Check it works: ollama list should show your model; the server listens on port 11434.',
+      'In the form below — Label: anything (e.g. My Ollama). API key: ollama (any text; Ollama ignores it). Base URL: http://localhost:11434/v1 (include /v1).',
+      'In Chat, pick Custom · llama3.2 (or the exact name from ollama list). Model names are case-sensitive.',
+    ],
+    ollamaBaseUrlHint:
+      'Must end with /v1 — e.g. http://localhost:11434/v1. For LM Studio, use its “Local server” URL (often http://localhost:1234/v1).',
+    ollamaApiKeyHint:
+      'Not a real secret for local Ollama — type ollama so the field is filled. LM Studio often accepts lm-studio or any placeholder.',
   },
   success: {
     keyAdded: 'Key added. Keeping it safe, yesss.',
+    keyReplaced: 'Key updated. The vault remembers your new secret.',
     unifiedGenerated:
       'Your prec_ key is forged. Guard it — unlike certain hobbits, you only see it once.',
     chainSaved: 'The fellowship order is set. Failover shall follow your command.',
-    healthCheck: 'The palantír has spoken. Key health updated.',
+    healthCheck: 'All keys probed — see results below each row.',
+    keyTest: (label: string) => `${label}: key is working.`,
   },
   warn: {
     unifiedNeedsKeys:
@@ -33,6 +54,37 @@ export const copy = {
 
 export function failoverToast(from: string, to: string): string {
   return copy.failover.replace('{from}', from).replace('{to}', to);
+}
+
+const HEALTH_STATUS_LABELS: Record<string, string> = {
+  healthy: 'working',
+  rate_limited: 'rate limited',
+  invalid: 'invalid key',
+  unknown: 'could not verify',
+};
+
+export function healthStatusLabel(status?: string | null): string {
+  return HEALTH_STATUS_LABELS[status ?? 'unknown'] ?? status ?? 'unknown';
+}
+
+export function formatHealthSummary(
+  keys: Array<{ label: string; healthStatus?: string | null }>,
+): string {
+  if (keys.length === 0) return 'No keys to check.';
+  const parts = keys.map((k) => `${k.label}: ${healthStatusLabel(k.healthStatus)}`);
+  return parts.join(' · ');
+}
+
+export function healthRowMessage(
+  label: string,
+  status?: string | null,
+  detail?: string,
+): string {
+  if (status === 'healthy') {
+    return `${label}: responded OK to a tiny test request.`;
+  }
+  if (detail) return `${label}: ${detail}`;
+  return `${label}: ${healthStatusLabel(status)}.`;
 }
 
 export function mapApiError(message: string, code?: string): string {

@@ -59,7 +59,7 @@ See [AGENTS.md](./AGENTS.md) for contributor/agent guide.
 
 ## Providers
 
-Groq, Google Gemini, OpenRouter, Mistral, OpenAI-compatible (Ollama, LM Studio). More planned — [PROVIDERS_BACKLOG.md](./PROVIDERS_BACKLOG.md).
+**17 adapters** — Groq, Gemini, Cerebras, Cloudflare, GitHub Models, OpenRouter, Mistral, HuggingFace, Ollama Cloud, OpenCode Zen, Zhipu, LLM7, Cohere, NVIDIA NIM, Pollinations (keyless), Kilo (keyless), plus custom OpenAI-compatible (Ollama, LM Studio). Cloud mode exposes only `cloudSafe` providers. See [PROVIDERS_BACKLOG.md](./PROVIDERS_BACKLOG.md).
 
 ## Hosted cloud
 

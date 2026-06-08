@@ -78,18 +78,39 @@ export class Router {
       .sort((a, b) => a.priority - b.priority);
   }
 
-  /** Pin starts at the matching entry; failover uses each entry's model (not the pinned name). */
+  /** Auto walks the full chain; a pinned model uses only that entry (backup keys for same provider still rotate). */
   private getChainToTry(
     chain: FallbackChainEntry[],
     pinnedModel?: string,
+    pinnedProvider?: ProviderId,
   ): FallbackChainEntry[] {
     const ordered = this.getOrderedChain(chain);
     if (!pinnedModel || pinnedModel === 'auto') return ordered;
 
-    const pinnedIdx = ordered.findIndex((e) => e.model === pinnedModel);
-    if (pinnedIdx < 0) return ordered;
+    const pinnedIdx = ordered.findIndex((e) => {
+      if (pinnedProvider) {
+        return e.providerId === pinnedProvider && e.model === pinnedModel;
+      }
+      return e.model === pinnedModel;
+    });
 
-    return [...ordered.slice(pinnedIdx), ...ordered.slice(0, pinnedIdx)];
+    if (pinnedIdx >= 0) {
+      return [ordered[pinnedIdx]!];
+    }
+
+    if (pinnedProvider) {
+      return [
+        {
+          providerId: pinnedProvider,
+          model: pinnedModel,
+          priority: 0,
+          enabled: true,
+        },
+      ];
+    }
+
+    const sameModel = ordered.filter((e) => e.model === pinnedModel);
+    return sameModel;
   }
 
   private freezeRequest(request: ChatCompletionRequest): ChatCompletionRequest {
@@ -106,7 +127,11 @@ export class Router {
   ): Promise<RouterResult> {
     const maxAttempts = ctx.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     const fullRequest = this.freezeRequest(request);
-    const chainToTry = this.getChainToTry(ctx.fallbackChain, fullRequest.model);
+    const chainToTry = this.getChainToTry(
+      ctx.fallbackChain,
+      fullRequest.model,
+      fullRequest.providerId,
+    );
 
     if (chainToTry.length === 0) {
       throw new RouterError('No models configured in fallback chain', false);
@@ -116,6 +141,7 @@ export class Router {
     const now = Date.now();
     const errors: string[] = [];
     let lastFailedProvider: ProviderId | undefined;
+    const pinBypassHealth = Boolean(fullRequest.providerId);
 
     for (const entry of chainToTry) {
       const adapter = this.adapters.get(entry.providerId);
@@ -133,8 +159,18 @@ export class Router {
       for (const keyRecord of keys) {
         const model = entry.model;
         const cdKey = this.cooldownKey(entry.providerId, model, keyRecord.id);
-        if (this.isOnCooldown(cdKey, now)) continue;
-        if (ctx.isKeyAvailable && !ctx.isKeyAvailable(entry.providerId, model, keyRecord.id)) {
+        if (this.isOnCooldown(cdKey, now)) {
+          errors.push(`${entry.providerId}/${model}: cooling down after a recent error`);
+          continue;
+        }
+        if (
+          ctx.isKeyAvailable &&
+          !pinBypassHealth &&
+          !ctx.isKeyAvailable(entry.providerId, model, keyRecord.id)
+        ) {
+          errors.push(
+            `${entry.providerId}/${model}: skipped (health check flagged this key — re-test in Keys)`,
+          );
           continue;
         }
 

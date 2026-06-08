@@ -30,6 +30,8 @@ const nextConfig = {
       { source: '/api/keys/providers', destination: `${apiUrl}/api/keys/providers` },
       { source: '/api/keys/settings', destination: `${apiUrl}/api/keys/settings` },
       { source: '/api/keys/usage', destination: `${apiUrl}/api/keys/usage` },
+      { source: '/api/keys/health-check', destination: `${apiUrl}/api/keys/health-check` },
+      { source: '/api/keys/:id/test', destination: `${apiUrl}/api/keys/:id/test` },
       { source: '/api/keys/:id', destination: `${apiUrl}/api/keys/:id` },
       { source: '/api/keys', destination: `${apiUrl}/api/keys` },
       { source: '/api/fallback-chain', destination: `${apiUrl}/api/fallback-chain` },

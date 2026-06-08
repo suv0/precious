@@ -32,6 +32,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   'google-gemini': 'Gemini',
   openrouter: 'OpenRouter',
   mistral: 'Mistral',
+  openai: 'OpenAI',
   'openai-compat': 'Custom',
 };
 

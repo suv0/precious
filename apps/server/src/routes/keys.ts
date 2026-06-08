@@ -2,10 +2,17 @@ import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { encrypt, generateUnifiedApiKey } from '@precious/core';
-import { LOCAL_PROVIDERS, getProviderMeta, getDefaultModels } from '@precious/providers';
+import { LOCAL_PROVIDERS, getProviderMeta, getDefaultModels, KEYLESS_SENTINEL } from '@precious/providers';
 import { getDb } from '../db/index.js';
-import { providerKeys, unifiedApiKeys, settings, fallbackChain } from '../db/schema.js';
+import {
+  providerKeys,
+  unifiedApiKeys,
+  settings,
+  fallbackChain,
+  keyUsageCounters,
+} from '../db/schema.js';
 import { logAudit } from '../lib/utils.js';
+import { ensureFallbackChainForKeys } from '../lib/fallback-chain.js';
 import { localApiAuth, type AppVariables } from '../middleware/auth.js';
 
 const keys = new Hono<{ Variables: AppVariables }>();
@@ -80,14 +87,21 @@ keys.post('/', async (c) => {
     cloudTrustAcknowledged?: boolean;
   }>();
 
-  if (!body.providerId || !body.label || !body.apiKey) {
-    return c.json({ error: 'providerId, label, and apiKey are required' }, 400);
+  if (!body.providerId || !body.label) {
+    return c.json({ error: 'providerId and label are required' }, 400);
   }
 
   const meta = getProviderMeta(body.providerId);
   if (!meta) {
     return c.json({ error: 'Unknown provider' }, 400);
   }
+
+  const rawKey = body.apiKey?.trim() ?? '';
+  if (!rawKey && !meta.keyless) {
+    return c.json({ error: 'providerId, label, and apiKey are required' }, 400);
+  }
+
+  const apiKey = rawKey || KEYLESS_SENTINEL;
 
   const [userSettings] = await db
     .select()
@@ -130,7 +144,7 @@ keys.post('/', async (c) => {
   }
 
   const id = uuidv4();
-  const encryptedKey = encrypt(body.apiKey, encryptionKey);
+  const encryptedKey = encrypt(apiKey, encryptionKey);
 
   await db.insert(providerKeys).values({
     id,
@@ -144,19 +158,20 @@ keys.post('/', async (c) => {
   });
 
   const existingChain = await db
-    .select()
+    .select({ providerId: fallbackChain.providerId })
     .from(fallbackChain)
-    .where(eq(fallbackChain.userId, userId))
-    .limit(1);
+    .where(eq(fallbackChain.userId, userId));
 
-  if (existingChain.length === 0) {
+  const hasProvider = existingChain.some((r) => r.providerId === body.providerId);
+  if (!hasProvider) {
+    const maxPriority = existingChain.length;
     const defaultModel = getDefaultModels(body.providerId)[0] ?? 'default';
     await db.insert(fallbackChain).values({
       id: uuidv4(),
       userId,
       providerId: body.providerId,
       model: defaultModel,
-      priority: 0,
+      priority: maxPriority,
       enabled: true,
     });
   }
@@ -172,6 +187,65 @@ keys.post('/', async (c) => {
     providerId: body.providerId,
     label: body.label,
     meta,
+  });
+});
+
+keys.patch('/:id', async (c) => {
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+  const db = getDb();
+  const encryptionKey = process.env.ENCRYPTION_KEY!;
+  const body = await c.req.json<{
+    apiKey: string;
+    label?: string;
+    customBaseUrl?: string | null;
+  }>();
+
+  if (!body.apiKey?.trim()) {
+    return c.json({ error: 'apiKey is required' }, 400);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(providerKeys)
+    .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)))
+    .limit(1);
+
+  if (!existing) {
+    return c.json({ error: 'Key not found' }, 404);
+  }
+
+  const encryptedKey = encrypt(body.apiKey.trim(), encryptionKey);
+  const patch: {
+    encryptedKey: string;
+    healthStatus: string;
+    label?: string;
+    customBaseUrl?: string | null;
+  } = {
+    encryptedKey,
+    healthStatus: 'unknown',
+  };
+
+  if (body.label !== undefined) patch.label = body.label.trim() || existing.label;
+  if (body.customBaseUrl !== undefined) {
+    patch.customBaseUrl = body.customBaseUrl?.trim() || null;
+  }
+
+  await db.update(providerKeys).set(patch).where(eq(providerKeys.id, id));
+
+  await db.delete(keyUsageCounters).where(eq(keyUsageCounters.providerKeyId, id));
+
+  await logAudit(db, userId, 'key_updated', {
+    resourceType: 'provider_key',
+    resourceId: id,
+    metadata: { providerId: existing.providerId },
+  });
+
+  return c.json({
+    id,
+    providerId: existing.providerId,
+    label: patch.label ?? existing.label,
+    meta: getProviderMeta(existing.providerId),
   });
 });
 
@@ -272,6 +346,53 @@ keys.get('/settings', async (c) => {
   return c.json({
     tosAcknowledged: row?.tosAcknowledged ?? false,
     cloudTrustAcknowledged: row?.cloudTrustAcknowledged ?? false,
+  });
+});
+
+keys.post('/:id/test', async (c) => {
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+  const db = getDb();
+  const encryptionKey = process.env.ENCRYPTION_KEY!;
+
+  const [existing] = await db
+    .select({ id: providerKeys.id })
+    .from(providerKeys)
+    .where(and(eq(providerKeys.id, id), eq(providerKeys.userId, userId)))
+    .limit(1);
+
+  if (!existing) {
+    return c.json({ error: 'Key not found' }, 404);
+  }
+
+  const { probeProviderKey, keyProbeMessage } = await import('../services/health.js');
+  const probe = await probeProviderKey(db, id, encryptionKey);
+
+  const [row] = await db
+    .select({
+      id: providerKeys.id,
+      providerId: providerKeys.providerId,
+      label: providerKeys.label,
+      customBaseUrl: providerKeys.customBaseUrl,
+      healthStatus: providerKeys.healthStatus,
+      createdAt: providerKeys.createdAt,
+    })
+    .from(providerKeys)
+    .where(eq(providerKeys.id, id))
+    .limit(1);
+
+  const key = row
+    ? {
+        ...row,
+        meta: getProviderMeta(row.providerId),
+      }
+    : null;
+
+  return c.json({
+    ok: probe.status === 'healthy',
+    healthStatus: probe.status,
+    message: keyProbeMessage(probe.status, probe.errorMessage),
+    key,
   });
 });
 

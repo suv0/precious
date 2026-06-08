@@ -41,6 +41,8 @@ export interface ProviderMeta {
   cloudSafe: boolean;
   keySetupUrl?: string;
   keySetupHint?: string;
+  keySetupLinkLabel?: string;
+  keyless?: boolean;
 }
 
 export interface ProviderKey {

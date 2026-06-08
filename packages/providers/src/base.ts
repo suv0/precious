@@ -15,7 +15,13 @@ export interface ProviderConfig {
   cloudSafe: boolean;
   defaultBaseUrl: string;
   defaultModels: string[];
+  timeoutMs?: number;
+  extraHeaders?: Record<string, string>;
+  /** Omit Authorization header; upstream allows anonymous access. */
+  keyless?: boolean;
 }
+
+export const KEYLESS_SENTINEL = 'keyless';
 
 const REQUEST_TIMEOUT_MS = 120_000;
 
@@ -126,22 +132,36 @@ export function resolveProviderBaseUrl(
   return (trimmed || defaultBaseUrl).replace(/\/$/, '');
 }
 
+function buildAuthHeaders(config: ProviderConfig, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...config.extraHeaders,
+  };
+  if (!config.keyless && apiKey !== KEYLESS_SENTINEL) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
+}
+
 export function createOpenAICompatAdapter(
   config: ProviderConfig,
 ): ProviderAdapter {
+  const timeoutMs = config.timeoutMs ?? REQUEST_TIMEOUT_MS;
+
   return {
     id: config.id,
 
     async chatCompletion(apiKey, model, request, baseUrl) {
       const url = `${resolveProviderBaseUrl(baseUrl, config.defaultBaseUrl)}/chat/completions`;
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(config, apiKey),
+          body: JSON.stringify(buildOpenAIRequestBody(model, request, false)),
         },
-        body: JSON.stringify(buildOpenAIRequestBody(model, request, false)),
-      });
+        timeoutMs,
+      );
       const response = await parseOpenAIResponse(res);
       response.precious = { provider: config.id, model, attempts: 1 };
       return response;
@@ -149,14 +169,15 @@ export function createOpenAICompatAdapter(
 
     async *streamChatCompletion(apiKey, model, request, baseUrl) {
       const url = `${resolveProviderBaseUrl(baseUrl, config.defaultBaseUrl)}/chat/completions`;
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(config, apiKey),
+          body: JSON.stringify(buildOpenAIRequestBody(model, request, true)),
         },
-        body: JSON.stringify(buildOpenAIRequestBody(model, request, true)),
-      });
+        timeoutMs,
+      );
       yield* streamOpenAIResponse(res, config.id, model);
       yield 'data: [DONE]\n\n';
     },

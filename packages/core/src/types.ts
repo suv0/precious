@@ -5,7 +5,20 @@ export type ProviderId =
   | 'google-gemini'
   | 'openrouter'
   | 'mistral'
-  | 'openai-compat';
+  | 'openai'
+  | 'openai-compat'
+  | 'cerebras'
+  | 'cloudflare'
+  | 'github-models'
+  | 'huggingface'
+  | 'cohere'
+  | 'ollama-cloud'
+  | 'zhipu'
+  | 'opencode'
+  | 'llm7'
+  | 'nvidia'
+  | 'pollinations'
+  | 'kilo';
 
 export interface ProviderMeta {
   id: ProviderId;
@@ -16,16 +29,26 @@ export interface ProviderMeta {
   /** Where to create an API key for this provider */
   keySetupUrl?: string;
   keySetupHint?: string;
+  /** Override default “Get API key” link text (e.g. local servers have no key portal). */
+  keySetupLinkLabel?: string;
+  /** Anonymous tier — no upstream API key required. */
+  keyless?: boolean;
 }
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | MessageContentPart[] | null;
   name?: string;
 }
 
+export type MessageContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' | 'auto' } };
+
 export interface ChatCompletionRequest {
   model?: string;
+  /** Pin routing to this provider when model exists on multiple chains */
+  providerId?: ProviderId;
   messages: ChatMessage[];
   stream?: boolean;
   temperature?: number;
@@ -122,6 +145,7 @@ export interface RateLimitResult {
 
 export type AuditAction =
   | 'key_created'
+  | 'key_updated'
   | 'key_deleted'
   | 'key_accessed'
   | 'unified_key_created'

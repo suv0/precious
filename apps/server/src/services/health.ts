@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { decrypt, healthFromError, type KeyHealthStatus } from '@precious/core';
-import { getDefaultModels } from '@precious/providers';
+import { getAllAdapters, getDefaultModels, verifyOpenRouterKey } from '@precious/providers';
 import type { Db } from '../db/index.js';
 import { providerKeys } from '../db/schema.js';
 
@@ -19,28 +19,59 @@ export async function updateKeyHealth(
     .where(eq(providerKeys.id, keyId));
 }
 
+export interface KeyProbeResult {
+  status: KeyHealthStatus;
+  errorMessage?: string;
+}
+
+export function keyProbeMessage(status: KeyHealthStatus, errorMessage?: string): string {
+  if (status === 'healthy') {
+    return errorMessage ?? 'Key responded to a minimal chat request.';
+  }
+  if (errorMessage) {
+    const short = errorMessage.length > 120 ? `${errorMessage.slice(0, 117)}…` : errorMessage;
+    if (status === 'rate_limited' && short.toLowerCase().includes('openrouter')) {
+      return `${short} Free models share capacity — your key may still work in Chat.`;
+    }
+    return short;
+  }
+  switch (status) {
+    case 'rate_limited':
+      return 'Rate limited — key may be valid but quota is exhausted.';
+    case 'invalid':
+      return 'Invalid or unauthorized — check the API key.';
+    default:
+      return 'Could not verify — provider returned an unexpected error.';
+  }
+}
+
 export async function probeProviderKey(
   db: Db,
   keyId: string,
   encryptionKey: string,
-): Promise<KeyHealthStatus> {
+): Promise<KeyProbeResult> {
   const [row] = await db.select().from(providerKeys).where(eq(providerKeys.id, keyId)).limit(1);
-  if (!row) return 'unknown';
+  if (!row) return { status: 'unknown' };
 
   const adapter = getAdapter(row.providerId);
   if (!adapter) {
     await updateKeyHealth(db, keyId, 'unknown');
-    return 'unknown';
+    return { status: 'unknown' };
   }
 
   try {
     const apiKey = decrypt(row.encryptedKey, encryptionKey);
+
+    if (row.providerId === 'openrouter') {
+      const detail = await verifyOpenRouterKey(apiKey);
+      await updateKeyHealth(db, keyId, 'healthy');
+      return { status: 'healthy', errorMessage: detail };
+    }
+
     const model =
       row.providerId === 'groq'
         ? 'llama-3.3-70b-versatile'
-        : row.providerId === 'openrouter'
-          ? 'meta-llama/llama-3.3-70b-instruct:free'
-          : getDefaultModels(row.providerId)[0] ?? 'default';
+        : getDefaultModels(row.providerId)[0] ?? 'default';
 
     await adapter.chatCompletion(
       apiKey,
@@ -50,11 +81,12 @@ export async function probeProviderKey(
     );
 
     await updateKeyHealth(db, keyId, 'healthy');
-    return 'healthy';
+    return { status: 'healthy' };
   } catch (err) {
     const status = healthFromError(err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
     await updateKeyHealth(db, keyId, status);
-    return status;
+    return { status, errorMessage };
   }
 }
 

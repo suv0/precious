@@ -23,6 +23,11 @@ export const PROVIDER_BAR_COLORS: Record<
     drained: 'bg-orange-950/80',
     ring: 'ring-orange-500/40',
   },
+  openai: {
+    charge: 'bg-teal-400',
+    drained: 'bg-teal-950/80',
+    ring: 'ring-teal-500/40',
+  },
   'openai-compat': {
     charge: 'bg-sky-400',
     drained: 'bg-sky-950/80',

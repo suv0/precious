@@ -10,8 +10,9 @@ import {
   healthFromError,
   type ChatCompletionRequest,
   type ProviderId,
+  type MessageContentPart,
 } from '@precious/core';
-import { getAllAdapters, LOCAL_PROVIDERS, getDefaultModels } from '@precious/providers';
+import { getAllAdapters, LOCAL_PROVIDERS, getDefaultModels, modelSupportsAttachments } from '@precious/providers';
 import { getDb } from '../db/index.js';
 import { providerKeys, fallbackChain } from '../db/schema.js';
 import { logAudit } from '../lib/utils.js';
@@ -30,6 +31,7 @@ import {
 } from '../lib/key-usage.js';
 import { updateKeyHealth } from '../services/health.js';
 import { localApiAuth, unifiedKeyAuth, type AppVariables } from '../middleware/auth.js';
+import { ensureFallbackChainForKeys } from '../lib/fallback-chain.js';
 
 const router = new Router(getAllAdapters());
 const accountRateLimiter = new RateLimitLedger({ requestsPerMinute: 60 });
@@ -55,6 +57,7 @@ async function loadUserContext(userId: string) {
   const db = getDb();
   const encryptionKey = process.env.ENCRYPTION_KEY!;
 
+  await ensureFallbackChainForKeys(db, userId);
   await hydrateKeyRateLedger(db, userId);
   const healthMap = await loadKeyHealthMap(db, userId);
 
@@ -107,16 +110,38 @@ function listModels(ctx: Awaited<ReturnType<typeof loadUserContext>>) {
       id: e.model,
       object: 'model' as const,
       owned_by: e.providerId,
+      supports_attachments: modelSupportsAttachments(e.providerId, e.model),
       precious: LOCAL_PROVIDERS.find((p) => p.id === e.providerId),
     }));
 
   if (chainModels.length === 0) {
-    return [{ id: AUTO_MODEL, object: 'model' as const, owned_by: 'precious' }];
+    return [
+      {
+        id: AUTO_MODEL,
+        object: 'model' as const,
+        owned_by: 'precious',
+        supports_attachments: false,
+      },
+    ];
   }
 
+  // Deduplicate same model id from different providers — keep both with unique keys in UI
+  const seen = new Set<string>();
+  const unique = chainModels.filter((m) => {
+    const key = `${m.owned_by}:${m.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   return [
-    { id: AUTO_MODEL, object: 'model' as const, owned_by: 'precious' },
-    ...chainModels,
+    {
+      id: AUTO_MODEL,
+      object: 'model' as const,
+      owned_by: 'precious',
+      supports_attachments: unique.some((m) => m.supports_attachments),
+    },
+    ...unique,
   ];
 }
 
@@ -150,19 +175,40 @@ async function* sseToPlainText(
       if (data === '[DONE]') return;
       try {
         const parsed = JSON.parse(data) as {
+          error?: { message?: string; code?: number | string } | string;
           choices?: Array<{
             delta?: { content?: string };
             message?: { content?: string };
           }>;
         };
+        if (parsed.error) {
+          const err = parsed.error;
+          const msg =
+            typeof err === 'string'
+              ? err
+              : err.message ?? `Provider error ${err.code ?? ''}`.trim();
+          throw new Error(msg || 'Provider returned a streaming error');
+        }
         const text =
           parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content;
         if (text) yield text;
-      } catch {
-        /* skip malformed SSE */
+      } catch (err) {
+        if (err instanceof SyntaxError) continue;
+        throw err;
       }
     }
   }
+}
+
+function messageContentToText(
+  content: string | MessageContentPart[] | null | undefined,
+): string {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  return content
+    .filter((p) => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n');
 }
 
 async function handleChat(
@@ -201,6 +247,7 @@ async function handleChat(
     ...body,
     messages,
     model: body.model || AUTO_MODEL,
+    providerId: body.providerId,
   };
 
   if (!panelMode) {
@@ -241,6 +288,11 @@ async function handleChat(
             assistantText += text;
             await s.write(text);
           }
+          if (!assistantText.trim()) {
+            assistantText =
+              'No response from the provider (empty stream). Often a rate limit on free models — try again or pick another model.';
+            await s.write(assistantText);
+          }
           await saveChatMessages(userId, [
             ...messages,
             { role: 'assistant', content: assistantText },
@@ -263,7 +315,8 @@ async function handleChat(
     setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, usage);
 
     if (panelMode && result.response) {
-      const text = result.response.choices[0]?.message?.content ?? '';
+      const raw = result.response.choices[0]?.message?.content;
+      const text = messageContentToText(raw);
       await saveChatMessages(userId, [
         ...messages,
         { role: 'assistant', content: text },

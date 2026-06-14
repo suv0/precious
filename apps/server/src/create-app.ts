@@ -33,6 +33,7 @@ export function createPreciousApp(options: {
         'X-Precious-Model',
         'X-Precious-Tokens',
         'X-Precious-Trail',
+        'X-Precious-Conversation',
         'X-Failover-From',
         'X-Routed-Via',
       ],
@@ -57,7 +58,7 @@ export function createPreciousApp(options: {
   const webDist = options.webDist;
   if (webDist) {
     // Static UI served by Node server in local/docker all-in-one mode
-    app.get('/', (c) => c.redirect('/settings/keys'));
+    app.get('/', (c) => c.redirect('/chat'));
   }
 
   return app;

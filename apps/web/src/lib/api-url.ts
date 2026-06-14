@@ -24,6 +24,7 @@ export const PRECIOUS_RESPONSE_HEADERS = [
   'x-precious-model',
   'x-precious-tokens',
   'x-precious-trail',
+  'x-precious-conversation',
   'x-failover-from',
   'x-routed-via',
 ] as const;

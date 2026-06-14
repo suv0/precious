@@ -16,14 +16,19 @@ import {
 } from '@precious/core';
 import { getAllAdapters, LOCAL_PROVIDERS, getDefaultModels, getModelAttachmentCapabilities } from '@precious/providers';
 import { getDb } from '../db/index.js';
-import { providerKeys, fallbackChain } from '../db/schema.js';
+import { providerKeys, fallbackChain, conversations } from '../db/schema.js';
 import { logAudit } from '../lib/utils.js';
 import {
   loadChatMessages,
   mergeChatMessages,
   saveChatMessages,
   clearChatMessages,
+  getConversationEntries,
+  createConversation,
+  deleteConversation,
+  updateConversationMeta,
   type MessageMeta,
+  type ConversationEntry,
 } from '../lib/chat-messages.js';
 import {
   hydrateKeyRateLedger,
@@ -168,6 +173,7 @@ function setRoutingHeaders(
   failoverFrom?: string,
   usage?: { total_tokens?: number },
   trail?: unknown,
+  conversationId?: string,
 ) {
   c.header('X-Precious-Provider', provider);
   c.header('X-Precious-Model', model);
@@ -180,6 +186,9 @@ function setRoutingHeaders(
   }
   if (trail) {
     c.header('X-Precious-Trail', JSON.stringify(trail));
+  }
+  if (conversationId) {
+    c.header('X-Precious-Conversation', conversationId);
   }
 }
 
@@ -311,14 +320,16 @@ async function handleChat(
     );
   }
 
-  const body = await c.req.json<ChatCompletionRequest>();
+  const body = await c.req.json<ChatCompletionRequest & { conversationId?: string }>();
   if (!body.messages?.length) {
     return c.json({ error: { message: 'messages required' } }, 400);
   }
 
+  let conversationId = body.conversationId;
+
   let messages = body.messages;
-  if (useStoredMessages) {
-    const stored = await loadChatMessages(userId);
+  if (useStoredMessages && conversationId) {
+    const stored = await loadChatMessages(userId, conversationId!);
     messages = mergeChatMessages(stored, body.messages);
   }
 
@@ -329,8 +340,37 @@ async function handleChat(
     providerId: body.providerId,
   };
 
-  if (!panelMode) {
-    await saveChatMessages(userId, messages);
+  // API mode: save incoming messages to conversation
+  if (!panelMode && conversationId) {
+    await saveChatMessages(userId, conversationId!, messages);
+  }
+
+  // Panel mode: auto-create conversation on first request if none provided
+  if (panelMode && !conversationId) {
+    const entry = await createConversation(userId);
+    conversationId = entry.id;
+  }
+
+  // Auto-title from first user message if still "New Chat"
+  if (panelMode && conversationId && messages.some((m) => m.role === 'user')) {
+    const dbForTitle = getDb();
+    const [current] = await dbForTitle
+      .select({ title: conversations.title })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    if (current?.title === 'New Chat') {
+      const firstUser = messages.find((m) => m.role === 'user');
+      if (firstUser) {
+        const firstContent = messageContentToText(firstUser.content);
+        if (firstContent.trim()) {
+          const title = firstContent.trim().length > 50
+            ? firstContent.trim().slice(0, 47) + '...'
+            : firstContent.trim();
+          await updateConversationMeta(conversationId, { title });
+        }
+      }
+    }
   }
 
   const ctx = await loadUserContext(userId);
@@ -379,7 +419,7 @@ async function handleChat(
     }
 
     if (wantsStream && result.stream) {
-      setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, undefined, result.trail);
+      setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, undefined, result.trail, conversationId);
 
       if (panelMode) {
         c.header('Content-Type', 'text/plain; charset=utf-8');
@@ -411,7 +451,7 @@ async function handleChat(
             await persistKeyUsage(db, usedKey.id, result.provider, result.model);
           }
 
-          await saveChatMessages(userId, [
+          await saveChatMessages(userId, conversationId!, [
             ...messages,
             { role: 'assistant', content: assistantText },
           ], buildMetaMap(messages.length, result));
@@ -447,12 +487,12 @@ async function handleChat(
     }
 
     const usage = result.response?.usage;
-    setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, usage);
+    setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, usage, undefined, conversationId);
 
     if (panelMode && result.response) {
       const raw = result.response.choices[0]?.message?.content;
       const text = messageContentToText(raw);
-      await saveChatMessages(userId, [
+      await saveChatMessages(userId, conversationId!, [
         ...messages,
         { role: 'assistant', content: text },
       ], buildMetaMap(messages.length, result));
@@ -536,7 +576,11 @@ export const chatSession = new Hono<{ Variables: AppVariables }>();
 chatSession.post('/completions', localApiAuth, (c) => handleChat(c, true, false));
 chatSession.get('/messages', localApiAuth, async (c) => {
   const userId = c.get('userId');
-  const messages = await loadChatMessages(userId);
+  const conversationId = c.req.query('conversationId');
+  if (!conversationId) {
+    return c.json({ error: 'conversationId required' }, 400);
+  }
+  const messages = await loadChatMessages(userId, conversationId!);
   const metaMap: Record<string, MessageMeta> = {};
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i] as { meta?: MessageMeta };
@@ -551,7 +595,37 @@ chatSession.get('/messages', localApiAuth, async (c) => {
 });
 chatSession.delete('/messages', localApiAuth, async (c) => {
   const userId = c.get('userId');
-  await clearChatMessages(userId);
+  const conversationId = c.req.query('conversationId');
+  if (!conversationId) {
+    return c.json({ error: 'conversationId required' }, 400);
+  }
+  await clearChatMessages(userId, conversationId!);
+  return c.json({ ok: true });
+});
+chatSession.get('/conversations', localApiAuth, async (c) => {
+  const userId = c.get('userId');
+  const entries = await getConversationEntries(userId);
+  return c.json({ conversations: entries });
+});
+chatSession.post('/conversations', localApiAuth, async (c) => {
+  const userId = c.get('userId');
+  const { title } = await c.req.json<{ title?: string }>();
+  const entry = await createConversation(userId, title);
+  return c.json({ conversation: entry });
+});
+chatSession.delete('/conversations/:id', localApiAuth, async (c) => {
+  const id = c.req.param('id');
+  if (!id) return c.json({ error: 'id required' }, 400);
+  await deleteConversation(id);
+  return c.json({ ok: true });
+});
+chatSession.patch('/conversations/:id', localApiAuth, async (c) => {
+  const id = c.req.param('id');
+  if (!id) return c.json({ error: 'id required' }, 400);
+  const { title } = await c.req.json<{ title?: string }>();
+  if (title !== undefined) {
+    await updateConversationMeta(id, { title });
+  }
   return c.json({ ok: true });
 });
 chatSession.get('/models', localApiAuth, async (c) => {

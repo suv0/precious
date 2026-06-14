@@ -2,7 +2,7 @@
 
 import { useChat, type Message } from 'ai/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanelLayout } from '../components/PanelLayout';
+import { useSearchParams } from 'next/navigation';
 import { ChatMessageBubble } from '../components/ChatMessageBubble';
 import { ChatComposer } from '../components/ChatComposer';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
@@ -57,26 +57,28 @@ function filesToFileList(files: File[]): FileList {
 function ChatPanelInner({
   apiBase,
   chatId,
+  conversationId,
   initialMessages,
   initialMeta,
   models,
   selectedModel,
   onSelectedModelChange,
-  onNewChat,
   onChatComplete,
   onRefreshModels,
+  onConversationCreated,
   quotaRefreshKey = 0,
 }: {
   apiBase?: string;
   chatId: string;
+  conversationId: string | null;
   initialMessages: Message[];
   initialMeta: Record<string, ChatResponseMeta>;
   models: ChatModelOption[];
   selectedModel: string;
   onSelectedModelChange: (model: string) => void;
-  onNewChat: () => void;
   onChatComplete?: () => void;
   onRefreshModels?: () => void;
+  onConversationCreated?: (cid: string) => void;
   quotaRefreshKey?: number;
 }) {
   const { summary: quotaSummary } = useQuotaUsage(apiBase, quotaRefreshKey);
@@ -84,6 +86,7 @@ function ChatPanelInner({
   const [messageMeta, setMessageMeta] = useState<Record<string, ChatResponseMeta>>(initialMeta);
   const [streamingMeta, setStreamingMeta] = useState<ChatResponseMeta | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [currentConvId, setCurrentConvId] = useState<string | null>(conversationId);
   const pendingMetaRef = useRef<ChatResponseMeta | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -105,12 +108,14 @@ function ChatPanelInner({
     initialMessages,
     streamProtocol: 'text',
     sendExtraMessageFields: true,
-    experimental_prepareRequestBody: ({ messages: chatMessages }) =>
-      prepareChatRequestBody({
+    experimental_prepareRequestBody: ({ messages: chatMessages }) => ({
+      ...prepareChatRequestBody({
         messages: chatMessages,
         selectedModel,
         models: modelOptions,
       }),
+      conversationId: currentConvId,
+    }),
     onResponse: (res) => {
       if (!res.ok) {
         setChatError(`Request failed (${res.status}). See error below or try Keys → test your OpenRouter key.`);
@@ -122,6 +127,14 @@ function ChatPanelInner({
       }
       const failoverFrom = res.headers.get('X-Failover-From');
       const provider = res.headers.get('X-Precious-Provider');
+
+      // Server returns a new conversation ID if one was auto-created
+      const serverCid = res.headers.get('X-Precious-Conversation');
+      if (serverCid && !currentConvId) {
+        setCurrentConvId(serverCid);
+        onConversationCreated?.(serverCid);
+      }
+
       if (failoverFrom && provider) {
         setFailoverToast(formatFailoverToast(failoverFrom, provider));
         setTimeout(() => setFailoverToast(null), 8000);
@@ -188,13 +201,6 @@ function ChatPanelInner({
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <h1 className="font-display text-2xl text-precious-gold">Chat</h1>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button
-            type="button"
-            onClick={onNewChat}
-            className="text-xs text-precious-muted hover:text-precious-gold border border-emerald-900/50 rounded-full px-3 py-1.5 transition-colors"
-          >
-            New chat
-          </button>
           <select
             className="precious-input py-1.5 text-sm w-auto min-w-[12rem]"
             value={selectedModel}
@@ -286,13 +292,27 @@ function ChatPanelInner({
 
 export function ChatPage() {
   const { apiBase, requireAuth, onAuthRequired } = usePanelConfig();
+  const searchParams = useSearchParams();
   const [models, setModels] = useState<ChatModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState(AUTO_MODEL);
-  const [chatId, setChatId] = useState('precious-local');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [chatKey, setChatKey] = useState(0);
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
   const [historyMeta, setHistoryMeta] = useState<Record<string, ChatResponseMeta>>({});
   const [historyReady, setHistoryReady] = useState(false);
   const [quotaRefreshKey, setQuotaRefreshKey] = useState(0);
+  const convIdRef = useRef<string | null>(null);
+
+  // Sync conversationId from URL
+  useEffect(() => {
+    const cid = searchParams.get('conversationId');
+    if (cid && cid !== convIdRef.current) {
+      convIdRef.current = cid;
+      setConversationId(cid);
+      setHistoryReady(false);
+      loadHistory(cid);
+    }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadModels = useCallback(async () => {
     try {
@@ -308,16 +328,12 @@ export function ChatPage() {
     }
   }, [apiBase, requireAuth, onAuthRequired]);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (cid: string) => {
     try {
       const res = await apiFetch<{
         messages: Array<{ role: string; content: string | null }>;
         metaMap?: Record<string, Record<string, unknown>>;
-      }>(
-        '/api/chat/messages',
-        undefined,
-        { apiBase },
-      );
+      }>(`/api/chat/messages?conversationId=${cid}`, undefined, { apiBase });
       setInitialMessages(toUiMessages(res.messages));
       if (res.metaMap) {
         const restoredMeta: Record<string, ChatResponseMeta> = {};
@@ -331,60 +347,77 @@ export function ChatPage() {
           };
         }
         setHistoryMeta(restoredMeta);
+      } else {
+        setHistoryMeta({});
       }
     } catch {
       setInitialMessages([]);
+      setHistoryMeta({});
     } finally {
       setHistoryReady(true);
     }
   }, [apiBase]);
 
-  useEffect(() => {
-    loadHistory();
-    loadModels();
-  }, [loadHistory, loadModels]);
+  // On conversation created by server, update URL and refresh sidebar
+  const handleConversationCreated = (cid: string) => {
+    convIdRef.current = cid;
+    setConversationId(cid);
+    window.history.replaceState(null, '', `/chat?conversationId=${cid}`);
+    window.dispatchEvent(new CustomEvent('precious:refresh-conversations'));
+  };
 
-  const handleNewChat = async () => {
-    try {
-      await apiFetch('/api/chat/messages', { method: 'DELETE' }, { apiBase });
-    } catch {
-      /* still reset UI */
+  // On mount: load models, then if URL has conversationId, load history
+  // If no conversationId, show empty ready state (user starts fresh)
+  useEffect(() => {
+    loadModels();
+    const cid = searchParams.get('conversationId');
+    if (cid) {
+      convIdRef.current = cid;
+      setConversationId(cid);
+      loadHistory(cid);
+    } else {
+      setConversationId(null);
+      setHistoryReady(true);
+      setInitialMessages([]);
+      setHistoryMeta({});
     }
-    setInitialMessages([]);
-    setHistoryMeta({});
-    setChatId(`precious-local-${Date.now()}`);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Chat complete — trigger sidebar refresh
+  const handleChatComplete = () => {
+    setQuotaRefreshKey((k) => k + 1);
+    window.dispatchEvent(new CustomEvent('precious:refresh-conversations'));
   };
 
   const hasRoutableModels = models.some((m) => m.id !== AUTO_MODEL);
 
   return (
-    <PanelLayout>
-      <div className="max-w-3xl mx-auto flex flex-col h-[calc(100vh-120px)] px-4 py-6 min-h-0">
-        {!hasRoutableModels && models.length > 0 && historyReady && (
-          <QuestBanner variant="warn">{copy.warn.chatNoKeys}</QuestBanner>
-        )}
+    <div className="max-w-3xl mx-auto flex flex-col h-full px-4 py-6 min-h-0">
+      {!hasRoutableModels && models.length > 0 && historyReady && (
+        <QuestBanner variant="warn">{copy.warn.chatNoKeys}</QuestBanner>
+      )}
 
-        {!historyReady ? (
-          <p className="text-precious-muted text-sm animate-pulse py-20 text-center font-display">
-            Loading conversation…
-          </p>
-        ) : (
-          <ChatPanelInner
-            key={chatId}
-            chatId={chatId}
-            apiBase={apiBase}
-            initialMessages={initialMessages}
-            initialMeta={historyMeta}
-            models={models}
-            selectedModel={selectedModel}
-            onSelectedModelChange={setSelectedModel}
-            onNewChat={handleNewChat}
-            onChatComplete={() => setQuotaRefreshKey((k) => k + 1)}
-            onRefreshModels={loadModels}
-            quotaRefreshKey={quotaRefreshKey}
-          />
-        )}
-      </div>
-    </PanelLayout>
+      {!historyReady ? (
+        <p className="text-precious-muted text-sm animate-pulse py-20 text-center font-display">
+          Loading conversation…
+        </p>
+      ) : (
+        <ChatPanelInner
+          key={`${conversationId ?? 'new'}-${chatKey}`}
+          chatId={`chat-${conversationId ?? 'new'}-${chatKey}`}
+          conversationId={conversationId}
+          apiBase={apiBase}
+          initialMessages={initialMessages}
+          initialMeta={historyMeta}
+          models={models}
+          selectedModel={selectedModel}
+          onSelectedModelChange={setSelectedModel}
+          onChatComplete={handleChatComplete}
+          onRefreshModels={loadModels}
+          onConversationCreated={handleConversationCreated}
+          quotaRefreshKey={quotaRefreshKey}
+        />
+      )}
+    </div>
   );
 }

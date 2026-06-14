@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PanelLayout } from '../components/PanelLayout';
 import { usePanelConfig } from '../config';
 import { apiFetch, type AuditLogEntry } from '../lib/api';
 
@@ -70,8 +69,7 @@ export function AuditPage() {
   const shown = routeEntries.length > 0 ? routeEntries : entries.slice(0, 100);
 
   return (
-    <PanelLayout>
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
         <div>
           <h1 className="font-display text-3xl text-precious-gold">Audit trail</h1>
           <p className="text-precious-muted text-sm mt-1">
@@ -135,6 +133,5 @@ export function AuditPage() {
           </div>
         )}
       </div>
-    </PanelLayout>
   );
 }

@@ -64,9 +64,19 @@ export const MIGRATION_SQL = `
     expires_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL DEFAULT 'New Chat',
+    model TEXT,
+    provider TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS chat_messages (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT,
     meta TEXT,
@@ -92,6 +102,7 @@ const LEGACY_ALTERS = [
   'ALTER TABLE key_usage_counters ADD COLUMN tokens_today INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE key_usage_counters ADD COLUMN model TEXT NOT NULL DEFAULT \'*\'',
   'ALTER TABLE chat_messages ADD COLUMN meta TEXT',
+  'ALTER TABLE chat_messages ADD COLUMN conversation_id TEXT',
 ];
 
 /** Handle key_usage_counters PK migration from single-column to composite. */

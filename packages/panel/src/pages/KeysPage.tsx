@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { PanelLayout } from '../components/PanelLayout';
 import { QuestBanner } from '../components/QuestBanner';
 import { RiskBadge, HealthDot } from '../components/RiskBadge';
 import { usePanelConfig } from '../config';
@@ -379,8 +378,7 @@ export function KeysPage() {
         : newKey.providerId;
 
   return (
-    <PanelLayout>
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
         <div>
           <h1 className="font-display text-3xl text-precious-gold">Keys & routing</h1>
           {legalLinks && (
@@ -828,6 +826,5 @@ export function KeysPage() {
           </section>
         )}
       </div>
-    </PanelLayout>
   );
 }

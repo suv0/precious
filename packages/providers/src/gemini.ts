@@ -1,10 +1,12 @@
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
+  EmbeddingRequest,
+  EmbeddingResponse,
   ProviderMeta,
 } from '@precious/core';
 import type { ProviderAdapter } from '@precious/core';
-import { fetchWithTimeout, resolveProviderBaseUrl, providerHttpError } from './base.js';
+import { fetchWithTimeout, resolveProviderBaseUrl, providerHttpError, extractRateLimitHeaders } from './base.js';
 
 export const geminiConfig = {
   id: 'google-gemini' as const,
@@ -17,6 +19,11 @@ export const geminiConfig = {
 
 function geminiUrl(baseUrl: string | null | undefined): string {
   return `${resolveProviderBaseUrl(baseUrl, geminiConfig.defaultBaseUrl)}/chat/completions`;
+}
+
+function geminiEmbeddingUrl(baseUrl: string | null | undefined, model: string, apiKey: string): string {
+  const base = resolveProviderBaseUrl(baseUrl, geminiConfig.defaultBaseUrl);
+  return `${base.replace('/openai', '')}/models/${model}:embedContent?key=${encodeURIComponent(apiKey)}`;
 }
 
 export const geminiAdapter: ProviderAdapter = {
@@ -37,7 +44,12 @@ export const geminiAdapter: ProviderAdapter = {
       throw providerHttpError(res.status, text, 'Gemini');
     }
     const response = (await res.json()) as ChatCompletionResponse;
-    response.precious = { provider: 'google-gemini', model, attempts: 1 };
+    response.precious = {
+      provider: 'google-gemini',
+      model,
+      attempts: 1,
+      ...(extractRateLimitHeaders(res.headers) ? { rateLimit: extractRateLimitHeaders(res.headers) } : {}),
+    };
     return response;
   },
 
@@ -86,6 +98,42 @@ export const geminiAdapter: ProviderAdapter = {
     }
     yield 'data: [DONE]\n\n';
   },
+
+  async embedding(apiKey, model, request, baseUrl) {
+    const url = geminiEmbeddingUrl(baseUrl, model, apiKey);
+    const inputs = Array.isArray(request.input) ? request.input : [request.input];
+
+    const allEmbeddings: Array<{ values: number[] }> = [];
+    for (const text of inputs) {
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: `models/${model}`,
+          content: { parts: [{ text }] },
+        }),
+      });
+      if (!res.ok) {
+        throw providerHttpError(res.status, await res.text(), 'Gemini');
+      }
+      const data = await res.json() as { embedding?: { values: number[] } };
+      if (!data.embedding?.values) {
+        throw new Error('Gemini embedding returned no values');
+      }
+      allEmbeddings.push(data.embedding);
+    }
+
+    return {
+      object: 'list',
+      data: allEmbeddings.map((emb, idx) => ({
+        object: 'embedding' as const,
+        index: idx,
+        embedding: emb.values,
+      })),
+      model,
+      usage: { prompt_tokens: 0, total_tokens: 0 },
+    };
+  },
 };
 
 function buildBody(
@@ -99,6 +147,8 @@ function buildBody(
     stream,
     temperature: request.temperature,
     max_tokens: request.max_tokens,
+    tools: request.tools,
+    tool_choice: request.tool_choice,
   };
 }
 
@@ -107,6 +157,7 @@ export const geminiMeta: ProviderMeta = {
   name: 'Google Gemini',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: geminiConfig.defaultBaseUrl,
   keySetupUrl: 'https://aistudio.google.com/apikey',
   keySetupHint: 'Google AI Studio → Get API key → Create. Free tier available.',

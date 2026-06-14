@@ -17,6 +17,7 @@ export const groqMeta: ProviderMeta = {
   name: 'Groq',
   riskLevel: 'low',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: groqConfig.defaultBaseUrl,
   keySetupUrl: 'https://console.groq.com/keys',
   keySetupHint: 'Sign up free → API Keys → Create. Keys start with gsk_',

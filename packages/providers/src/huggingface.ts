@@ -21,6 +21,7 @@ export const huggingfaceMeta: ProviderMeta = {
   name: 'HuggingFace Router',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: huggingfaceConfig.defaultBaseUrl,
   keySetupUrl: 'https://huggingface.co/settings/tokens',
   keySetupHint: 'Create a read token → Inference Providers router. ~$0.10/mo free credit.',

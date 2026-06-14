@@ -6,7 +6,7 @@ import type {
   ProviderMeta,
 } from '@precious/core';
 import type { ProviderAdapter } from '@precious/core';
-import { fetchWithTimeout, providerHttpError, streamOpenAIResponse } from './base.js';
+import { fetchWithTimeout, providerHttpError, streamOpenAIResponse, extractRateLimitHeaders } from './base.js';
 
 export const cloudflareConfig = {
   id: 'cloudflare' as const,
@@ -14,10 +14,11 @@ export const cloudflareConfig = {
   riskLevel: 'medium' as const,
   cloudSafe: true,
   defaultModels: [
-    '@cf/moonshotai/kimi-k2-instruct',
-    '@cf/z-ai/glm-4.7-flash',
-    '@cf/openai/gpt-oss-20b',
-    '@cf/ibm-granite/granite-4.0-h-micro',
+    '@cf/moonshotai/kimi-k2.6',
+    '@cf/zai-org/glm-4.7-flash',
+    '@cf/google/gemma-4-26b-a4b-it',
+    '@cf/meta/llama-3.1-8b-instruct',
+    '@cf/openai/gpt-oss-120b',
   ],
 };
 
@@ -79,7 +80,12 @@ export const cloudflareAdapter: ProviderAdapter = {
       throw providerHttpError(res.status, text, 'Cloudflare');
     }
     const response = (await res.json()) as ChatCompletionResponse;
-    response.precious = { provider: 'cloudflare', model, attempts: 1 };
+    response.precious = {
+      provider: 'cloudflare',
+      model,
+      attempts: 1,
+      ...(extractRateLimitHeaders(res.headers) ? { rateLimit: extractRateLimitHeaders(res.headers) } : {}),
+    };
     return response;
   },
 
@@ -103,6 +109,7 @@ export const cloudflareMeta: ProviderMeta = {
   name: 'Cloudflare Workers AI',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   keySetupUrl: 'https://dash.cloudflare.com/?to=/:account/ai/workers-ai',
   keySetupHint:
     'Paste key as account_id:api_token. Create token at Profile → API Tokens with Workers AI Read.',

@@ -17,6 +17,7 @@ export const opencodeMeta: ProviderMeta = {
   name: 'OpenCode Zen',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: opencodeConfig.defaultBaseUrl,
   keySetupUrl: 'https://opencode.ai/auth',
   keySetupHint: 'Free account (no card) → promotional models. Prompts may be used for training.',

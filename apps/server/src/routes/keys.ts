@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { encrypt, generateUnifiedApiKey } from '@precious/core';
 import { LOCAL_PROVIDERS, getProviderMeta, getDefaultModels, KEYLESS_SENTINEL } from '@precious/providers';
@@ -10,6 +10,7 @@ import {
   settings,
   fallbackChain,
   keyUsageCounters,
+  auditLog,
 } from '../db/schema.js';
 import { logAudit } from '../lib/utils.js';
 import { ensureFallbackChainForKeys } from '../lib/fallback-chain.js';
@@ -422,5 +423,43 @@ keys.post('/health-check', async (c) => {
 
   return c.json({ keys: enriched });
 });
+
+keys.get('/audit', async (c) => {
+  const userId = c.get('userId');
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: auditLog.id,
+      action: auditLog.action,
+      resourceType: auditLog.resourceType,
+      resourceId: auditLog.resourceId,
+      metadata: auditLog.metadata,
+      createdAt: auditLog.createdAt,
+    })
+    .from(auditLog)
+    .where(eq(auditLog.userId, userId))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(200);
+
+  const entries = rows.map((row) => ({
+    id: row.id,
+    action: row.action,
+    resourceType: row.resourceType,
+    resourceId: row.resourceId,
+    metadata: tryParseMeta(row.metadata),
+    createdAt: row.createdAt.toISOString(),
+  }));
+
+  return c.json({ entries });
+});
+
+function tryParseMeta(meta: string | null): Record<string, unknown> | null {
+  if (!meta) return null;
+  try {
+    return JSON.parse(meta);
+  } catch {
+    return null;
+  }
+}
 
 export { keys };

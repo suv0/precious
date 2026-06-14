@@ -78,6 +78,29 @@ export function getProviderMeta(id: string): ProviderMeta | undefined {
 
 export { modelSupportsAttachments, getModelAttachmentCapabilities } from './attachments.js';
 
+export function getEmbeddingModels(providerId: string): string[] {
+  switch (providerId) {
+    case 'groq':
+      return ['llama-3.1-8b-instant'];
+    case 'google-gemini':
+      return ['text-embedding-004'];
+    case 'openrouter':
+      return ['openai/text-embedding-3-small'];
+    case 'openai':
+      return ['text-embedding-3-small', 'text-embedding-3-large'];
+    case 'mistral':
+      return ['mistral-embed'];
+    case 'cohere':
+      return ['embed-english-v3.0', 'embed-multilingual-v3.0'];
+    case 'zhipu':
+      return ['embedding-3'];
+    case 'opencode':
+      return ['text-embedding-3-small'];
+    default:
+      return [];
+  }
+}
+
 export function getDefaultModels(providerId: string): string[] {
   switch (providerId) {
     case 'groq':
@@ -85,11 +108,11 @@ export function getDefaultModels(providerId: string): string[] {
     case 'google-gemini':
       return ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
     case 'cerebras':
-      return ['qwen-3-235b-a22b-instruct-2507', 'llama-3.3-70b'];
+      return ['gpt-oss-120b', 'zai-glm-4.7'];
     case 'cloudflare':
-      return ['@cf/moonshotai/kimi-k2-instruct', '@cf/z-ai/glm-4.7-flash'];
+      return ['@cf/moonshotai/kimi-k2.6', '@cf/zai-org/glm-4.7-flash', '@cf/meta/llama-3.1-8b-instruct'];
     case 'github-models':
-      return ['openai/gpt-4.1', 'openai/gpt-4o'];
+      return ['openai/gpt-4.1', 'openai/gpt-4o', 'openai/gpt-4o-mini'];
     case 'openrouter':
       return ['meta-llama/llama-3.3-70b-instruct:free'];
     case 'mistral':

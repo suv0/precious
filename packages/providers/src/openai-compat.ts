@@ -17,6 +17,7 @@ export const openaiCompatMeta: ProviderMeta = {
   name: 'Custom OpenAI-compatible',
   riskLevel: 'medium',
   cloudSafe: false,
+  freeTier: true,
   keySetupUrl: 'https://docs.ollama.com/api/openai-compatibility',
   keySetupLinkLabel: 'Ollama OpenAI API docs →',
   keySetupHint:

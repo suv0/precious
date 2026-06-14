@@ -25,6 +25,7 @@ export const openrouterMeta: ProviderMeta = {
   name: 'OpenRouter',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: openrouterConfig.defaultBaseUrl,
   keySetupUrl: 'https://openrouter.ai/keys',
   keySetupHint:

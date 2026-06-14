@@ -32,6 +32,7 @@ const emptyNewKey = (providerId: string) => ({
   label: '',
   apiKey: '',
   customBaseUrl: '',
+  cloudflareAccountId: '',
 });
 
 export function KeysPage() {
@@ -70,7 +71,7 @@ export function KeysPage() {
   );
 
   const showAddForm =
-    addMode === 'backup' || providersWithoutKey.length > 0;
+    addMode === 'backup' || providersWithoutKey.length > 0 || (providers.length > 0 && keys.length === 0);
 
   useEffect(() => {
     Promise.all([
@@ -148,6 +149,10 @@ export function KeysPage() {
     }
 
     try {
+      const apiKey = newKey.providerId === 'cloudflare' && newKey.cloudflareAccountId.trim()
+        ? `${newKey.cloudflareAccountId.trim()}:${newKey.apiKey}`
+        : newKey.apiKey;
+
       await apiFetch(
         '/api/keys',
         {
@@ -155,7 +160,7 @@ export function KeysPage() {
           body: JSON.stringify({
             providerId: newKey.providerId,
             label: newKey.label,
-            apiKey: newKey.apiKey,
+            apiKey,
             ...(newKey.providerId === 'openai-compat' && newKey.customBaseUrl.trim()
               ? { customBaseUrl: newKey.customBaseUrl.trim() }
               : {}),
@@ -454,7 +459,7 @@ export function KeysPage() {
             </p>
           )}
 
-          {!showAddForm && (
+          {!showAddForm && hasProviderKeys && (
             <p className="text-sm text-precious-muted leading-relaxed">
               {copy.keys.allProvidersConfigured}
             </p>
@@ -507,10 +512,11 @@ export function KeysPage() {
                   value={newKey.providerId}
                   disabled={addMode === 'backup'}
                   onChange={(e) => setNewKey({ ...newKey, providerId: e.target.value })}
+                  style={{ color: '#e8f0ec' }}
                 >
                   {addProviderList.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.riskLevel} risk)
+                    <option key={p.id} value={p.id} style={{ background: '#0a1612', color: '#e8f0ec' }}>
+                      {p.name} ({p.riskLevel} risk){p.freeTier === false ? ' 💳' : ''}
                     </option>
                   ))}
                 </select>
@@ -558,22 +564,41 @@ export function KeysPage() {
                   onChange={(e) => setNewKey({ ...newKey, label: e.target.value })}
                   required
                 />
+                {newKey.providerId === 'cloudflare' && (
+                  <>
+                    <input
+                      className="precious-input"
+                      placeholder="Account ID (from dashboard URL or Workers AI page)"
+                      value={newKey.cloudflareAccountId}
+                      onChange={(e) => setNewKey({ ...newKey, cloudflareAccountId: e.target.value })}
+                      required
+                    />
+                    <input
+                      className="precious-input font-mono"
+                      placeholder="API Token (with Workers AI Read permission)"
+                      type="password"
+                      value={newKey.apiKey}
+                      onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
+                      required
+                    />
+                  </>
+                )}
+                {newKey.providerId !== 'cloudflare' && (
                 <input
                   className="precious-input font-mono"
                   placeholder={
                     selectedProvider?.keyless
                       ? 'API key (optional — anonymous tier)'
-                      : newKey.providerId === 'cloudflare'
-                        ? 'account_id:api_token'
-                        : newKey.providerId === 'openai-compat'
-                          ? 'API key (use ollama for local Ollama)'
-                          : 'API key'
+                      : newKey.providerId === 'openai-compat'
+                        ? 'API key (use ollama for local Ollama)'
+                        : 'API key'
                   }
                   type="password"
                   value={newKey.apiKey}
                   onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
                   required={!selectedProvider?.keyless}
                 />
+                )}
                 {newKey.providerId === 'openai-compat' && (
                   <>
                     <p className="text-[11px] text-precious-muted -mt-1">{copy.keys.ollamaApiKeyHint}</p>

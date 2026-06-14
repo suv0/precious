@@ -145,6 +145,14 @@ Current shipped: Groq, Google Gemini, OpenRouter, Mistral, OpenAI-compat (custom
 - Do not commit secrets (`ENCRYPTION_KEY`, `AUTH_SECRET`, `DATABASE_URL`)
 - Do not put marketing/landing pages in the public MIT repo
 - Do not duplicate router logic in `precious-cloud`
+- **NEVER delete or lose user API keys.** Provider keys and unified keys are irreplaceable. When a DB migration requires dropping or recreating tables:
+  1. **Export keys first** — back up `provider_keys`, `unified_api_keys`, and `fallback_chain` rows before altering schema
+  2. **Perform the migration** — alter/drop/recreate tables as needed
+  3. **Restore keys** — re-insert the backed-up rows into the new schema
+  4. **Verify** — confirm `/api/keys` returns all keys and `/api/chat/models` lists all models
+  - Encrypted keys can be backed up as-is (they're opaque blobs). No need to decrypt.
+  - Rate counters (`key_usage_counters`) are ephemeral — safe to drop during migrations.
+  - `settings`, `sessions`, `chat_messages`, `audit_log` are also safe to drop.
 
 ## Development
 

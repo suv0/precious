@@ -17,6 +17,7 @@ export const zhipuMeta: ProviderMeta = {
   name: 'Z.ai (Zhipu)',
   riskLevel: 'medium',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: zhipuConfig.defaultBaseUrl,
   keySetupUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
   keySetupHint: 'Register at open.bigmodel.cn → API Keys. GLM-4.5 / GLM-4.7 Flash free tier.',

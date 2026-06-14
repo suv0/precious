@@ -1,6 +1,6 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
-import { schema, MIGRATION_SQL, migrateLegacyColumns } from '@precious/db';
+import { schema, MIGRATION_SQL, migrateLegacyColumns, migrateKeyUsageCountersPK } from '@precious/db';
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
@@ -30,6 +30,7 @@ async function runMigrations(client: ReturnType<typeof createClient>) {
     await client.execute(stmt);
   }
   await migrateLegacyColumns((sql) => client.execute(sql));
+  await migrateKeyUsageCountersPK((sql) => client.execute(sql));
 }
 
 export function getDb() {

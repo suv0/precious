@@ -17,8 +17,9 @@ export const githubModelsMeta: ProviderMeta = {
   name: 'GitHub Models',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: githubModelsConfig.defaultBaseUrl,
-  keySetupUrl: 'https://github.com/settings/personal-access-tokens',
+  keySetupUrl: 'https://github.com/settings/tokens',
   keySetupHint:
-    'Create a fine-grained PAT with Models access, or use GitHub CLI auth. Experimentation tier only.',
+    'Create a classic PAT (Tokens → Generate new token → Generate new token (classic)). No extra scopes needed — the token just authenticates your GitHub account. Browse models at github.com/marketplace/models.',
 };

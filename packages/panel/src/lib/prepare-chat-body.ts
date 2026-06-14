@@ -147,6 +147,15 @@ export function prepareChatRequestBody({
     body.providerId = providerId;
   }
 
+  // Set attachment flags for vision auto-routing
+  if (messages.some((m) => m.experimental_attachments?.length)) {
+    body.hasAttachments = true;
+    const types: string[] = [];
+    if (caps.images) types.push('image');
+    if (caps.documents) types.push('document');
+    body.attachmentTypes = types;
+  }
+
   return body;
 }
 

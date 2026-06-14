@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -26,13 +26,17 @@ export const providerKeys = sqliteTable('provider_keys', {
 
 export const keyUsageCounters = sqliteTable('key_usage_counters', {
   providerKeyId: text('provider_key_id')
-    .primaryKey()
+    .notNull()
     .references(() => providerKeys.id, { onDelete: 'cascade' }),
+  model: text('model').notNull().default('*'),
   minuteCount: integer('minute_count').notNull().default(0),
   minuteWindowStart: integer('minute_window_start').notNull(),
   dayCount: integer('day_count').notNull().default(0),
   dayWindowStart: integer('day_window_start').notNull(),
-});
+  tokensToday: integer('tokens_today').notNull().default(0),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.providerKeyId, table.model] }),
+}));
 
 export const unifiedApiKeys = sqliteTable('unified_api_keys', {
   id: text('id').primaryKey(),
@@ -95,6 +99,7 @@ export const chatMessages = sqliteTable('chat_messages', {
     .references(() => users.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   content: text('content'),
+  meta: text('meta'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

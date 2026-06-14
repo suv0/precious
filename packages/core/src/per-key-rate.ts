@@ -5,6 +5,8 @@ export interface KeyUsageSnapshot {
   minuteWindowStart: number;
   dayCount: number;
   dayWindowStart: number;
+  /** Cumulative tokens used today (prompt + completion) */
+  tokensToday: number;
 }
 
 interface BucketEntry extends KeyUsageSnapshot {}
@@ -52,6 +54,13 @@ export class PerKeyRateLedger {
     bucket.dayCount += 1;
   }
 
+  /** Record token usage for this key. */
+  recordTokens(key: string, tokens: number, now = Date.now()): void {
+    const bucket = this.getOrCreateBucket(key, now);
+    this.rollWindows(bucket, now);
+    bucket.tokensToday += tokens;
+  }
+
   private rollWindows(bucket: BucketEntry, now: number): void {
     if (now - bucket.minuteWindowStart >= 60_000) {
       bucket.minuteCount = 0;
@@ -59,6 +68,7 @@ export class PerKeyRateLedger {
     }
     if (now - bucket.dayWindowStart >= 86_400_000) {
       bucket.dayCount = 0;
+      bucket.tokensToday = 0;
       bucket.dayWindowStart = now;
     }
   }
@@ -71,6 +81,7 @@ export class PerKeyRateLedger {
         minuteWindowStart: now,
         dayCount: 0,
         dayWindowStart: now,
+        tokensToday: 0,
       };
       this.buckets.set(key, bucket);
     }

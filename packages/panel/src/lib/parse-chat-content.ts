@@ -2,6 +2,15 @@ export interface ChatResponseMeta {
   provider?: string | null;
   model?: string | null;
   tokens?: number | null;
+  trail?: RouteAttempt[] | null;
+}
+
+export interface RouteAttempt {
+  provider: string;
+  model: string;
+  result: 'success' | 'error' | 'skipped';
+  error?: string;
+  skipped?: string;
 }
 
 export interface ParsedChatContent {

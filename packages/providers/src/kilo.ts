@@ -18,6 +18,7 @@ export const kiloMeta: ProviderMeta = {
   name: 'Kilo Gateway',
   riskLevel: 'medium',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: kiloConfig.defaultBaseUrl,
   keySetupUrl: 'https://kilo.ai',
   keySetupLinkLabel: 'Kilo Gateway docs →',

@@ -20,11 +20,14 @@ export const MIGRATION_SQL = `
     created_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS key_usage_counters (
-    provider_key_id TEXT PRIMARY KEY REFERENCES provider_keys(id) ON DELETE CASCADE,
+    provider_key_id TEXT NOT NULL REFERENCES provider_keys(id) ON DELETE CASCADE,
+    model TEXT NOT NULL DEFAULT '*',
     minute_count INTEGER NOT NULL DEFAULT 0,
     minute_window_start INTEGER NOT NULL,
     day_count INTEGER NOT NULL DEFAULT 0,
-    day_window_start INTEGER NOT NULL
+    day_window_start INTEGER NOT NULL,
+    tokens_today INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (provider_key_id, model)
   );
   CREATE TABLE IF NOT EXISTS unified_api_keys (
     id TEXT PRIMARY KEY,
@@ -66,6 +69,7 @@ export const MIGRATION_SQL = `
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT,
+    meta TEXT,
     created_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS oauth_accounts (
@@ -85,7 +89,42 @@ const LEGACY_ALTERS = [
   'ALTER TABLE provider_keys ADD COLUMN health_status TEXT DEFAULT \'unknown\'',
   'ALTER TABLE provider_keys ADD COLUMN last_checked_at INTEGER',
   'ALTER TABLE settings ADD COLUMN cloud_trust_acknowledged INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE key_usage_counters ADD COLUMN tokens_today INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE key_usage_counters ADD COLUMN model TEXT NOT NULL DEFAULT \'*\'',
+  'ALTER TABLE chat_messages ADD COLUMN meta TEXT',
 ];
+
+/** Handle key_usage_counters PK migration from single-column to composite. */
+export async function migrateKeyUsageCountersPK(execute: (sql: string) => unknown | Promise<unknown>) {
+  try {
+    // Check if the old table still has a single-column PK
+    const result = await execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='key_usage_counters'"
+    );
+    const rows = result as unknown as { rows?: Array<{ sql: string }> } | undefined;
+    const ddl = rows?.rows?.[0]?.sql ?? '';
+    // Old schema has "provider_key_id TEXT PRIMARY KEY" (single column)
+    // New schema has "PRIMARY KEY (provider_key_id, model)" (composite)
+    if (ddl.includes('PRIMARY KEY (provider_key_id, model)') || ddl.includes('PRIMARY KEY("provider_key_id", "model")')) {
+      return; // already migrated
+    }
+    // Recreate with composite PK
+    await execute('DROP TABLE key_usage_counters');
+    await execute(`
+      CREATE TABLE key_usage_counters (
+        provider_key_id TEXT NOT NULL REFERENCES provider_keys(id) ON DELETE CASCADE,
+        model TEXT NOT NULL DEFAULT '*',
+        minute_count INTEGER NOT NULL DEFAULT 0,
+        minute_window_start INTEGER NOT NULL,
+        day_count INTEGER NOT NULL DEFAULT 0,
+        day_window_start INTEGER NOT NULL,
+        PRIMARY KEY (provider_key_id, model)
+      )
+    `);
+  } catch {
+    /* best effort — new installs get the right schema from MIGRATION_SQL */
+  }
+}
 
 export async function migrateLegacyColumns(
   execute: (sql: string) => unknown | Promise<unknown>,

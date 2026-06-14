@@ -23,6 +23,7 @@ export const PRECIOUS_RESPONSE_HEADERS = [
   'x-precious-provider',
   'x-precious-model',
   'x-precious-tokens',
+  'x-precious-trail',
   'x-failover-from',
   'x-routed-via',
 ] as const;

@@ -4,7 +4,20 @@ import type { ChatMessage } from '@precious/core';
 import { getDb } from '../db/index.js';
 import { chatMessages } from '../db/schema.js';
 
-export async function loadChatMessages(userId: string): Promise<ChatMessage[]> {
+export interface MessageMeta {
+  provider?: string;
+  model?: string;
+  tokens?: number;
+  trail?: Array<{
+    provider: string;
+    model: string;
+    result: 'success' | 'error' | 'skipped';
+    error?: string;
+    skipped?: string;
+  }>;
+}
+
+export async function loadChatMessages(userId: string): Promise<Array<ChatMessage & { meta?: MessageMeta }>> {
   const db = getDb();
   const rows = await db
     .select()
@@ -15,6 +28,7 @@ export async function loadChatMessages(userId: string): Promise<ChatMessage[]> {
   return rows.map((r) => ({
     role: r.role as ChatMessage['role'],
     content: parseStoredContent(r.content ?? ''),
+    ...(r.meta ? { meta: JSON.parse(r.meta) as MessageMeta } : {}),
   }));
 }
 
@@ -51,6 +65,7 @@ export function mergeChatMessages(
 export async function saveChatMessages(
   userId: string,
   messages: ChatMessage[],
+  messageMeta?: Map<number, MessageMeta>,
 ): Promise<void> {
   const db = getDb();
   await db.delete(chatMessages).where(eq(chatMessages.userId, userId));
@@ -58,11 +73,13 @@ export async function saveChatMessages(
   const now = Date.now();
   for (let i = 0; i < messages.length; i += 1) {
     const msg = messages[i];
+    const meta = messageMeta?.get(i);
     await db.insert(chatMessages).values({
       id: uuidv4(),
       userId,
       role: msg.role,
       content: serializeContent(msg.content),
+      meta: meta ? JSON.stringify(meta) : null,
       createdAt: new Date(now + i),
     });
   }

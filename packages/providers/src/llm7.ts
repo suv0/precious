@@ -17,6 +17,7 @@ export const llm7Meta: ProviderMeta = {
   name: 'LLM7',
   riskLevel: 'medium',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: llm7Config.defaultBaseUrl,
   keySetupUrl: 'https://llm7.io',
   keySetupHint: 'Free tier ~100 req/hr. Anonymous access works for basic models; optional API token.',

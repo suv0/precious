@@ -2,7 +2,10 @@ import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
   ChatCompletionChunk,
+  EmbeddingRequest,
+  EmbeddingResponse,
   ProviderId,
+  RateLimitSnapshot,
 } from '@precious/core';
 import type { ProviderAdapter } from '@precious/core';
 
@@ -52,6 +55,44 @@ export function buildOpenAIRequestBody(
     max_tokens: request.max_tokens,
     top_p: request.top_p,
     stop: request.stop,
+    tools: request.tools,
+    tool_choice: request.tool_choice,
+  };
+}
+
+export function extractRateLimitHeaders(
+  headers: Headers,
+): RateLimitSnapshot | undefined {
+  const getNum = (h: string) => {
+    const v = headers.get(h);
+    return v ? Number(v) : undefined;
+  };
+  const getReset = (h: string) => {
+    const v = headers.get(h);
+    if (!v) return undefined;
+    const n = Number(v);
+    if (Number.isNaN(n)) return undefined;
+    return n > 1e12 ? Math.floor(n / 1000) : n;
+  };
+
+  const limitRequests =
+    getNum('x-ratelimit-limit-requests') ?? getNum('x-ratelimit-limit');
+  const remainingRequests =
+    getNum('x-ratelimit-remaining-requests') ?? getNum('x-ratelimit-remaining');
+  const limitTokens = getNum('x-ratelimit-limit-tokens');
+  const remainingTokens = getNum('x-ratelimit-remaining-tokens');
+
+  if (limitRequests == null && limitTokens == null) return undefined;
+
+  return {
+    limitRequests,
+    remainingRequests,
+    resetRequests:
+      getReset('x-ratelimit-reset-requests') ?? getReset('x-ratelimit-reset'),
+    limitTokens,
+    remainingTokens,
+    resetTokens: getReset('x-ratelimit-reset-tokens'),
+    fetchedAt: Date.now(),
   };
 }
 
@@ -60,7 +101,12 @@ export async function parseOpenAIResponse(res: Response): Promise<ChatCompletion
     const text = await res.text();
     throw providerHttpError(res.status, text);
   }
-  return (await res.json()) as ChatCompletionResponse;
+  const response = (await res.json()) as ChatCompletionResponse;
+  const rateLimit = extractRateLimitHeaders(res.headers);
+  if (rateLimit && response.precious) {
+    response.precious.rateLimit = rateLimit;
+  }
+  return response;
 }
 
 export function providerHttpError(status: number, body: string, providerName?: string): Error {
@@ -99,6 +145,8 @@ export async function* streamOpenAIResponse(
   const decoder = new TextDecoder();
   let buffer = '';
 
+  let firstChunk = true;
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -111,11 +159,21 @@ export async function* streamOpenAIResponse(
       const trimmed = line.trim();
       if (!trimmed || !trimmed.startsWith('data:')) continue;
       const data = trimmed.slice(5).trim();
-      if (data === '[DONE]') return;
+      if (data === '[DONE]') {
+        yield 'data: [DONE]\n\n';
+        return;
+      }
 
       try {
         const chunk = JSON.parse(data) as ChatCompletionChunk;
         chunk.precious = { provider, model };
+        if (firstChunk) {
+          const rateLimit = extractRateLimitHeaders(res.headers);
+          if (rateLimit) {
+            (chunk.precious as Record<string, unknown>).rateLimit = rateLimit;
+          }
+          firstChunk = false;
+        }
         yield `data: ${JSON.stringify(chunk)}\n\n`;
       } catch {
         // skip malformed chunks
@@ -163,7 +221,12 @@ export function createOpenAICompatAdapter(
         timeoutMs,
       );
       const response = await parseOpenAIResponse(res);
-      response.precious = { provider: config.id, model, attempts: 1 };
+      response.precious = {
+        provider: config.id,
+        model,
+        attempts: 1,
+        ...(response.precious?.rateLimit ? { rateLimit: response.precious.rateLimit } : {}),
+      };
       return response;
     },
 
@@ -180,6 +243,31 @@ export function createOpenAICompatAdapter(
       );
       yield* streamOpenAIResponse(res, config.id, model);
       yield 'data: [DONE]\n\n';
+    },
+
+    async embedding(apiKey, model, request, baseUrl) {
+      const url = `${resolveProviderBaseUrl(baseUrl, config.defaultBaseUrl)}/embeddings`;
+      const res = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(config, apiKey),
+          body: JSON.stringify({
+            model,
+            input: request.input,
+            ...(request.dimensions != null && { dimensions: request.dimensions }),
+            ...(request.encoding_format != null && { encoding_format: request.encoding_format }),
+          }),
+        },
+        timeoutMs,
+      );
+      if (!res.ok) {
+        const text = await res.text();
+        throw providerHttpError(res.status, text, config.name);
+      }
+      const response = (await res.json()) as EmbeddingResponse;
+      response.precious = { provider: config.id, model, attempts: 1 };
+      return response;
     },
   };
 }

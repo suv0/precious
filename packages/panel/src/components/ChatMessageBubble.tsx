@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { isImageFile } from '../lib/attachment-files';
 import {
   formatResponseMeta,
   parseChatContent,
   type ChatResponseMeta,
+  type RouteAttempt,
 } from '../lib/parse-chat-content';
 import { MarkdownLite } from '../lib/render-markdown-lite';
 import { ChatRouteMetaChip } from './ChatRouteMetaChip';
@@ -107,8 +109,49 @@ export function ChatMessageBubble({
             </p>
           )}
         </div>
+        {displayMeta?.trail && displayMeta.trail.length > 0 && (
+          <RouteTrailChip trail={displayMeta.trail} />
+        )}
         {copyBtn}
       </div>
+    </div>
+  );
+}
+
+function RouteTrailChip({ trail }: { trail: RouteAttempt[] }) {
+  const [open, setOpen] = useState(false);
+
+  const skipped = trail.filter((a) => a.result !== 'success');
+  const label = skipped.length > 0
+    ? skipped.map((a) => (a.result === 'skipped' ? `↷ ${a.provider}` : `✕ ${a.provider}`)).join(' → ')
+    : `✓ ${trail[0]!.provider}`;
+  if (!label) return null;
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-[10px] text-precious-muted/50 hover:text-precious-muted/80 transition-colors font-mono tracking-tight"
+        title="Routing trail — which providers were tried before this one replied"
+      >
+        ⚡ {label} {open ? '▾' : '▸'}
+      </button>
+      {open && (
+        <div className="text-[10px] text-precious-muted/80 space-y-0.5 pl-2 border-l border-emerald-900/30">
+          {trail.map((a, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className={a.result === 'success' ? 'text-emerald-400/70' : a.result === 'error' ? 'text-red-400/70' : 'text-amber-400/60'}>
+                {a.result === 'success' ? '✓' : a.result === 'error' ? '✕' : '↷'}
+              </span>
+              <span className="text-precious-text/60">{a.provider}</span>
+              <span className="text-precious-muted/50">{a.model}</span>
+              {a.error && <span className="text-red-400/60 break-all">{a.error.slice(0, 80)}</span>}
+              {a.skipped && <span className="text-amber-400/50">{a.skipped}</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

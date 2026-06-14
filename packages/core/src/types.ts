@@ -33,12 +33,34 @@ export interface ProviderMeta {
   keySetupLinkLabel?: string;
   /** Anonymous tier — no upstream API key required. */
   keyless?: boolean;
+  /** Free tier available — no payment or card required. false = needs billing. */
+  freeTier: boolean;
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
 }
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | MessageContentPart[] | null;
   name?: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
 }
 
 export type MessageContentPart =
@@ -55,6 +77,12 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
   top_p?: number;
   stop?: string | string[];
+  tools?: ToolDefinition[];
+  tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; function: { name: string } };
+  /** Set by UI when request contains image_url parts or inlined documents */
+  hasAttachments?: boolean;
+  /** Specific attachment types present in the request */
+  attachmentTypes?: ('image' | 'document')[];
 }
 
 export interface ChatCompletionChoice {
@@ -69,6 +97,26 @@ export interface ChatCompletionUsage {
   total_tokens: number;
 }
 
+export interface RateLimitSnapshot {
+  limitRequests?: number;
+  remainingRequests?: number;
+  resetRequests?: number;
+  limitTokens?: number;
+  remainingTokens?: number;
+  resetTokens?: number;
+  fetchedAt: number;
+}
+
+export interface RouteAttempt {
+  provider: ProviderId;
+  model: string;
+  result: 'success' | 'error' | 'skipped';
+  /** Error message if result is 'error'. */
+  error?: string;
+  /** Reason if skipped (cooldown, unhealthy, no key). */
+  skipped?: string;
+}
+
 export interface ChatCompletionResponse {
   id: string;
   object: 'chat.completion';
@@ -81,6 +129,8 @@ export interface ChatCompletionResponse {
     model: string;
     attempts: number;
     failoverFrom?: ProviderId;
+    rateLimit?: RateLimitSnapshot;
+    routeTrail?: RouteAttempt[];
   };
 }
 
@@ -121,6 +171,10 @@ export interface KeyAvailabilityCheck {
   (providerId: ProviderId, model: string, keyId: string): boolean;
 }
 
+export interface AttachmentCapabilityCheck {
+  (providerId: ProviderId, model: string): { images: boolean; documents: boolean };
+}
+
 export interface RouterContext {
   userId: string;
   fallbackChain: FallbackChainEntry[];
@@ -129,6 +183,8 @@ export interface RouterContext {
   maxAttempts?: number;
   /** Skip keys that are over RPM/RPD caps or marked unhealthy */
   isKeyAvailable?: KeyAvailabilityCheck;
+  /** Check model attachment capabilities for vision auto-routing */
+  getAttachmentCapabilities?: AttachmentCapabilityCheck;
 }
 
 export interface RateLimitConfig {
@@ -152,6 +208,38 @@ export type AuditAction =
   | 'login'
   | 'setup'
   | 'chat_request';
+
+export interface EmbeddingRequest {
+  model?: string;
+  providerId?: ProviderId;
+  input: string | string[];
+  dimensions?: number;
+  encoding_format?: 'float' | 'base64';
+}
+
+export interface EmbeddingData {
+  object: 'embedding';
+  index: number;
+  embedding: number[];
+}
+
+export interface EmbeddingUsage {
+  prompt_tokens: number;
+  total_tokens: number;
+}
+
+export interface EmbeddingResponse {
+  object: 'list';
+  data: EmbeddingData[];
+  model: string;
+  usage: EmbeddingUsage;
+  precious?: {
+    provider: ProviderId;
+    model: string;
+    attempts: number;
+    failoverFrom?: ProviderId;
+  };
+}
 
 export interface AuditLogEntry {
   userId: string;

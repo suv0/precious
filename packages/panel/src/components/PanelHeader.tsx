@@ -12,6 +12,7 @@ export function PanelHeader() {
   const nav = [
     { href: '/chat', label: 'Chat' },
     { href: '/settings/keys', label: 'Keys' },
+    { href: '/settings/audit', label: 'Audit' },
     ...(showDocsLink ? [{ href: '/docs', label: 'Docs' }] : []),
   ];
 

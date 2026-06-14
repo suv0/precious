@@ -17,6 +17,7 @@ export async function getUsageSummaryForUser(db: Db, userId: string): Promise<Us
       minuteWindowStart: keyUsageCounters.minuteWindowStart,
       dayCount: keyUsageCounters.dayCount,
       dayWindowStart: keyUsageCounters.dayWindowStart,
+      tokensToday: keyUsageCounters.tokensToday,
     })
     .from(providerKeys)
     .leftJoin(keyUsageCounters, eq(keyUsageCounters.providerKeyId, providerKeys.id))
@@ -35,10 +36,13 @@ export async function getUsageSummaryForUser(db: Db, userId: string): Promise<Us
               minuteWindowStart: row.minuteWindowStart ?? Date.now(),
               dayCount: row.dayCount ?? 0,
               dayWindowStart: row.dayWindowStart ?? Date.now(),
+              tokensToday: row.tokensToday ?? 0,
             }
           : undefined),
     };
   });
 
-  return buildUsageSummary(keys, Date.now(), DEFAULT_KEY_RATE_LIMITS);
+  const summary = buildUsageSummary(keys, Date.now(), DEFAULT_KEY_RATE_LIMITS);
+
+  return summary;
 }

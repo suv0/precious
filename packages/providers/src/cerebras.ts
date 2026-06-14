@@ -7,7 +7,7 @@ export const cerebrasConfig: ProviderConfig = {
   riskLevel: 'low',
   cloudSafe: true,
   defaultBaseUrl: 'https://api.cerebras.ai/v1',
-  defaultModels: ['qwen-3-235b-a22b-instruct-2507', 'llama-3.3-70b'],
+  defaultModels: ['gpt-oss-120b', 'zai-glm-4.7'],
 };
 
 export const cerebrasAdapter = createOpenAICompatAdapter(cerebrasConfig);
@@ -17,6 +17,7 @@ export const cerebrasMeta: ProviderMeta = {
   name: 'Cerebras',
   riskLevel: 'low',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: cerebrasConfig.defaultBaseUrl,
   keySetupUrl: 'https://cloud.cerebras.ai/platform',
   keySetupHint: 'Sign up free → API Keys → Create. Very fast inference on Qwen3 235B.',

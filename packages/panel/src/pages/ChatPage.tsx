@@ -25,10 +25,16 @@ import { useQuotaUsage } from '../hooks/useQuotaUsage';
 
 function metaFromHeaders(res: Response): ChatResponseMeta {
   const tokens = res.headers.get('X-Precious-Tokens');
+  const trailRaw = res.headers.get('X-Precious-Trail');
+  let trail = null;
+  if (trailRaw) {
+    try { trail = JSON.parse(trailRaw); } catch { /* ignore */ }
+  }
   return {
     provider: res.headers.get('X-Precious-Provider'),
     model: res.headers.get('X-Precious-Model'),
     tokens: tokens ? Number(tokens) : null,
+    trail,
   };
 }
 
@@ -52,6 +58,7 @@ function ChatPanelInner({
   apiBase,
   chatId,
   initialMessages,
+  initialMeta,
   models,
   selectedModel,
   onSelectedModelChange,
@@ -63,6 +70,7 @@ function ChatPanelInner({
   apiBase?: string;
   chatId: string;
   initialMessages: Message[];
+  initialMeta: Record<string, ChatResponseMeta>;
   models: ChatModelOption[];
   selectedModel: string;
   onSelectedModelChange: (model: string) => void;
@@ -73,7 +81,7 @@ function ChatPanelInner({
 }) {
   const { summary: quotaSummary } = useQuotaUsage(apiBase, quotaRefreshKey);
   const [failoverToast, setFailoverToast] = useState<string | null>(null);
-  const [messageMeta, setMessageMeta] = useState<Record<string, ChatResponseMeta>>({});
+  const [messageMeta, setMessageMeta] = useState<Record<string, ChatResponseMeta>>(initialMeta);
   const [streamingMeta, setStreamingMeta] = useState<ChatResponseMeta | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const pendingMetaRef = useRef<ChatResponseMeta | null>(null);
@@ -191,9 +199,14 @@ function ChatPanelInner({
             className="precious-input py-1.5 text-sm w-auto min-w-[12rem]"
             value={selectedModel}
             onChange={(e) => onSelectedModelChange(e.target.value)}
+            style={{ color: '#e8f0ec' }}
           >
             {modelOptions.map((m) => (
-              <option key={modelSelectValue(m)} value={modelSelectValue(m)}>
+              <option
+                key={modelSelectValue(m)}
+                value={modelSelectValue(m)}
+                style={{ background: '#0a1612', color: '#e8f0ec' }}
+              >
                 {formatModelOptionLabel(m)}
               </option>
             ))}
@@ -277,6 +290,7 @@ export function ChatPage() {
   const [selectedModel, setSelectedModel] = useState(AUTO_MODEL);
   const [chatId, setChatId] = useState('precious-local');
   const [initialMessages, setInitialMessages] = useState<Message[]>([]);
+  const [historyMeta, setHistoryMeta] = useState<Record<string, ChatResponseMeta>>({});
   const [historyReady, setHistoryReady] = useState(false);
   const [quotaRefreshKey, setQuotaRefreshKey] = useState(0);
 
@@ -289,18 +303,35 @@ export function ChatPage() {
       );
       setModels(r.data);
     } catch {
+      setModels([{ id: AUTO_MODEL, owned_by: 'precious' }]);
       if (requireAuth && onAuthRequired) onAuthRequired();
     }
   }, [apiBase, requireAuth, onAuthRequired]);
 
   const loadHistory = useCallback(async () => {
     try {
-      const res = await apiFetch<{ messages: Array<{ role: string; content: string | null }> }>(
+      const res = await apiFetch<{
+        messages: Array<{ role: string; content: string | null }>;
+        metaMap?: Record<string, Record<string, unknown>>;
+      }>(
         '/api/chat/messages',
         undefined,
         { apiBase },
       );
       setInitialMessages(toUiMessages(res.messages));
+      if (res.metaMap) {
+        const restoredMeta: Record<string, ChatResponseMeta> = {};
+        for (const [idx, meta] of Object.entries(res.metaMap)) {
+          const id = `history-${idx}`;
+          restoredMeta[id] = {
+            provider: meta.provider as string | undefined,
+            model: meta.model as string | undefined,
+            tokens: meta.tokens as number | undefined,
+            trail: meta.trail as ChatResponseMeta['trail'],
+          };
+        }
+        setHistoryMeta(restoredMeta);
+      }
     } catch {
       setInitialMessages([]);
     } finally {
@@ -320,6 +351,7 @@ export function ChatPage() {
       /* still reset UI */
     }
     setInitialMessages([]);
+    setHistoryMeta({});
     setChatId(`precious-local-${Date.now()}`);
   };
 
@@ -342,6 +374,7 @@ export function ChatPage() {
             chatId={chatId}
             apiBase={apiBase}
             initialMessages={initialMessages}
+            initialMeta={historyMeta}
             models={models}
             selectedModel={selectedModel}
             onSelectedModelChange={setSelectedModel}

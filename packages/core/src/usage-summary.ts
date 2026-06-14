@@ -1,5 +1,5 @@
 import type { ProviderId } from './types.js';
-import { DEFAULT_KEY_RATE_LIMITS } from './key-health.js';
+import { DEFAULT_KEY_RATE_LIMITS, getProviderDailyLimit, getProviderTokenBudget } from './key-health.js';
 import type { KeyUsageSnapshot } from './per-key-rate.js';
 
 export interface ProviderUsageSegment {
@@ -7,7 +7,7 @@ export interface ProviderUsageSegment {
   label: string;
   /** Share of the combined bar width (0–100). */
   weightPercent: number;
-  /** Fraction of this provider's daily budget consumed (0–1). */
+  /** Fraction of this provider's daily token budget consumed (0–1). */
   usedFraction: number;
   /** Fraction remaining (0–1). */
   remainingFraction: number;
@@ -16,14 +16,23 @@ export interface ProviderUsageSegment {
   usedThisMinute: number;
   minuteLimit: number;
   keyCount: number;
+  /** Tokens consumed today (prompt + completion). */
+  tokensToday: number;
+  /** Estimated daily token budget for this provider. */
+  tokenBudget: number;
+  source?: 'live' | 'estimated';
 }
 
 export interface UsageSummary {
   segments: ProviderUsageSegment[];
   totalDailyLimit: number;
   totalUsedToday: number;
-  /** What the bar represents — honest labeling for UI. */
-  metric: 'requests';
+  /** Total tokens consumed today across all providers. */
+  totalTokensToday: number;
+  /** Total token budget across all providers. */
+  totalTokenBudget: number;
+  /** What the bar represents. */
+  metric: 'tokens';
   resetsDayAt: number | null;
 }
 
@@ -47,7 +56,7 @@ interface KeyUsageRow {
 
 /**
  * Build stacked capacity segments for the multi-provider "battery" bar.
- * Each provider's width ∝ its daily request budget; fill ∝ requests used today.
+ * Bar width ∝ token budget; fill ∝ tokens consumed today.
  */
 export function buildUsageSummary(
   keys: KeyUsageRow[],
@@ -56,7 +65,15 @@ export function buildUsageSummary(
 ): UsageSummary {
   const byProvider = new Map<
     string,
-    { usedToday: number; usedMinute: number; dailyLimit: number; keyCount: number; dayStart: number }
+    {
+      usedToday: number;
+      usedMinute: number;
+      dailyLimit: number;
+      dayStart: number;
+      keyCount: number;
+      tokenBudget: number;
+      tokensToday: number;
+    }
   >();
 
   for (const key of keys) {
@@ -74,16 +91,23 @@ export function buildUsageSummary(
       minuteCount = 0;
     }
 
+    const providerLimit = getProviderDailyLimit(key.providerId);
+    const tokenBudget = getProviderTokenBudget(key.providerId);
+
     const existing = byProvider.get(key.providerId) ?? {
       usedToday: 0,
       usedMinute: 0,
       dailyLimit: 0,
-      keyCount: 0,
       dayStart,
+      keyCount: 0,
+      tokenBudget: 0,
+      tokensToday: 0,
     };
     existing.usedToday += dayCount;
     existing.usedMinute += minuteCount;
-    existing.dailyLimit += limits.requestsPerDay ?? 14_400;
+    existing.dailyLimit += providerLimit;
+    existing.tokenBudget += tokenBudget;
+    existing.tokensToday += snap?.tokensToday ?? 0;
     existing.keyCount += 1;
     existing.dayStart = Math.min(existing.dayStart, dayStart);
     byProvider.set(key.providerId, existing);
@@ -92,14 +116,15 @@ export function buildUsageSummary(
   const entries = [...byProvider.entries()];
   const totalDailyLimit = entries.reduce((s, [, v]) => s + v.dailyLimit, 0);
   const totalUsedToday = entries.reduce((s, [, v]) => s + v.usedToday, 0);
+  const totalTokenBudget = entries.reduce((s, [, v]) => s + v.tokenBudget, 0);
+  const totalTokensToday = entries.reduce((s, [, v]) => s + v.tokensToday, 0);
 
   const segments: ProviderUsageSegment[] = entries.map(([providerId, v]) => {
-    const usedFraction =
-      v.dailyLimit > 0 ? Math.min(1, v.usedToday / v.dailyLimit) : 0;
+    const usedFraction = v.tokenBudget > 0 ? Math.min(1, v.tokensToday / v.tokenBudget) : 0;
     return {
       providerId: providerId as ProviderId,
       label: providerUsageLabel(providerId),
-      weightPercent: totalDailyLimit > 0 ? (v.dailyLimit / totalDailyLimit) * 100 : 0,
+      weightPercent: totalTokenBudget > 0 ? (v.tokenBudget / totalTokenBudget) * 100 : 0,
       usedFraction,
       remainingFraction: 1 - usedFraction,
       usedToday: v.usedToday,
@@ -107,6 +132,8 @@ export function buildUsageSummary(
       usedThisMinute: v.usedMinute,
       minuteLimit: limits.requestsPerMinute * v.keyCount,
       keyCount: v.keyCount,
+      tokensToday: v.tokensToday,
+      tokenBudget: v.tokenBudget,
     };
   });
 
@@ -117,7 +144,9 @@ export function buildUsageSummary(
     segments,
     totalDailyLimit,
     totalUsedToday,
-    metric: 'requests',
+    totalTokensToday,
+    totalTokenBudget,
+    metric: 'tokens',
     resetsDayAt: earliestDayStart != null ? earliestDayStart + 86_400_000 : null,
   };
 }

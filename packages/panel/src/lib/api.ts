@@ -43,6 +43,7 @@ export interface ProviderMeta {
   keySetupHint?: string;
   keySetupLinkLabel?: string;
   keyless?: boolean;
+  freeTier?: boolean;
 }
 
 export interface ProviderKey {
@@ -72,14 +73,28 @@ export interface ProviderUsageSegment {
   usedThisMinute: number;
   minuteLimit: number;
   keyCount: number;
+  tokensToday: number;
+  tokenBudget: number;
+  source?: 'live' | 'estimated';
 }
 
 export interface UsageSummary {
   segments: ProviderUsageSegment[];
   totalDailyLimit: number;
   totalUsedToday: number;
-  metric: 'requests';
+  totalTokensToday: number;
+  totalTokenBudget: number;
+  metric: 'tokens';
   resetsDayAt: number | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 export const AUTO_MODEL = 'auto';

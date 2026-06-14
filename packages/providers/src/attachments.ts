@@ -15,7 +15,7 @@ const IMAGE_RULES: Record<ProviderId, CapabilityRule> = {
     include: ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-preview'],
   },
   cerebras: { patterns: ['vision'] },
-  cloudflare: { patterns: ['vision', 'vl-', 'pixtral'] },
+  cloudflare: { patterns: ['kimi-k2.6', 'vision', 'vl-', 'pixtral', 'gemma-4-26b'] },
   'github-models': { patterns: ['gpt-4o', 'gpt-4.1', 'gpt-4-turbo', 'vision'] },
   openrouter: {
     patterns: [
@@ -104,9 +104,4 @@ export function getModelAttachmentCapabilities(
 export function modelSupportsAttachments(providerId: string, model: string): boolean {
   const caps = getModelAttachmentCapabilities(providerId, model);
   return caps.images || caps.documents;
-}
-
-/** @deprecated use getModelAttachmentCapabilities — kept for importers of vision.ts */
-export function modelSupportsImages(providerId: string, model: string): boolean {
-  return getModelAttachmentCapabilities(providerId, model).images;
 }

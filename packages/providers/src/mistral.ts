@@ -17,6 +17,7 @@ export const mistralMeta: ProviderMeta = {
   name: 'Mistral',
   riskLevel: 'low',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: mistralConfig.defaultBaseUrl,
   keySetupUrl: 'https://console.mistral.ai/api-keys/',
   keySetupHint: 'Create account → API Keys → Create new key.',

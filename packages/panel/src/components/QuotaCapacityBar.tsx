@@ -23,11 +23,11 @@ export function QuotaCapacityBar({
   return (
     <div
       className="space-y-2"
-      title="Requests routed through Precious today vs estimated daily budget per provider. Provider quotas may differ."
+      title="Tokens consumed today across all connected providers vs your estimated token budget."
     >
       <div className="flex items-center justify-between gap-2 text-[11px] text-precious-muted">
         <span className="font-display tracking-wide text-precious-muted/90">
-          Routing budget
+          Routing budget · {summary.totalTokensToday.toLocaleString()} / {summary.totalTokenBudget.toLocaleString()} today
         </span>
         {!compact && summary.resetsDayAt && (
           <span>{formatReset(summary.resetsDayAt)}</span>
@@ -53,7 +53,7 @@ export function QuotaCapacityBar({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={`${seg.label} ${remainingPct}% remaining`}
-              title={`${seg.label}: ${seg.usedToday.toLocaleString()} / ${seg.dailyLimit.toLocaleString()} requests today (${remainingPct}% left)`}
+              title={`${seg.label}: ${seg.tokensToday.toLocaleString()} / ${seg.tokenBudget.toLocaleString()} tokens today (${remainingPct}% left)${seg.source === 'live' ? ' · live from provider' : seg.source === 'estimated' ? ' · estimated' : ''}`}
             >
               {/* Remaining "charge" fills from the right */}
               <div
@@ -82,7 +82,7 @@ export function QuotaCapacityBar({
                 {!compact && (
                   <span className="text-precious-muted/70">
                     {' '}
-                    ({seg.usedToday}/{seg.dailyLimit})
+                    ({seg.tokensToday.toLocaleString()}/{seg.tokenBudget.toLocaleString()})
                   </span>
                 )}
               </span>

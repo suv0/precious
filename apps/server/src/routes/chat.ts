@@ -8,7 +8,9 @@ import {
   RateLimitLedger,
   AUTO_MODEL,
   healthFromError,
+  setLiveRateLimit,
   type ChatCompletionRequest,
+  type EmbeddingRequest,
   type ProviderId,
   type MessageContentPart,
 } from '@precious/core';
@@ -21,19 +23,24 @@ import {
   mergeChatMessages,
   saveChatMessages,
   clearChatMessages,
+  type MessageMeta,
 } from '../lib/chat-messages.js';
 import {
   hydrateKeyRateLedger,
   buildKeyAvailabilityChecker,
   loadKeyHealthMap,
   recordKeyUsage,
+  recordKeyTokens,
   persistKeyUsage,
 } from '../lib/key-usage.js';
 import { updateKeyHealth } from '../services/health.js';
 import { localApiAuth, unifiedKeyAuth, type AppVariables } from '../middleware/auth.js';
 import { ensureFallbackChainForKeys } from '../lib/fallback-chain.js';
 
-const router = new Router(getAllAdapters());
+const router = new Router(
+  getAllAdapters(),
+  (providerId, model) => getModelAttachmentCapabilities(providerId, model),
+);
 const accountRateLimiter = new RateLimitLedger({ requestsPerMinute: 60 });
 const apiRateLimiter = new RateLimitLedger({ requestsPerMinute: 120 });
 
@@ -160,6 +167,7 @@ function setRoutingHeaders(
   model: string,
   failoverFrom?: string,
   usage?: { total_tokens?: number },
+  trail?: unknown,
 ) {
   c.header('X-Precious-Provider', provider);
   c.header('X-Precious-Model', model);
@@ -170,11 +178,58 @@ function setRoutingHeaders(
   if (usage?.total_tokens != null) {
     c.header('X-Precious-Tokens', String(usage.total_tokens));
   }
+  if (trail) {
+    c.header('X-Precious-Trail', JSON.stringify(trail));
+  }
 }
 
-/** OpenAI SSE chunks → plain text for panel useChat (streamProtocol: text). */
+interface StreamUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+/** Estimate tokens from text using ~4 chars per token heuristic. */
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+/** Wrap an SSE stream generator and extract any usage metadata found in chunks.
+ *  Also accumulates output text for fallback token estimation. */
+async function* interceptSSEUsage(
+  stream: AsyncGenerator<string, void, unknown>,
+  usageOut: { current: StreamUsage | null; outputText: string },
+): AsyncGenerator<string, void, unknown> {
+  for await (const chunk of stream) {
+    yield chunk;
+    for (const line of chunk.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(data) as {
+          usage?: StreamUsage;
+          choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
+        };
+        if (parsed.usage) {
+          usageOut.current = parsed.usage;
+        }
+        const text = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content;
+        if (text) usageOut.outputText += text;
+      } catch {
+        // skip
+      }
+    }
+  }
+}
+
+/** OpenAI SSE chunks → plain text for panel useChat (streamProtocol: text).
+ *  Also collects any usage metadata found in the stream chunks. */
 async function* sseToPlainText(
   stream: AsyncGenerator<string, void, unknown>,
+  usageOut: { current: StreamUsage | null },
 ): AsyncGenerator<string, void, unknown> {
   for await (const chunk of stream) {
     for (const line of chunk.split('\n')) {
@@ -189,6 +244,7 @@ async function* sseToPlainText(
             delta?: { content?: string };
             message?: { content?: string };
           }>;
+          usage?: StreamUsage;
         };
         if (parsed.error) {
           const err = parsed.error;
@@ -197,6 +253,9 @@ async function* sseToPlainText(
               ? err
               : err.message ?? `Provider error ${err.code ?? ''}`.trim();
           throw new Error(msg || 'Provider returned a streaming error');
+        }
+        if (parsed.usage) {
+          usageOut.current = parsed.usage;
         }
         const text =
           parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content;
@@ -218,6 +277,17 @@ function messageContentToText(
     .filter((p) => p.type === 'text')
     .map((p) => p.text)
     .join('\n');
+}
+
+function buildMetaMap(assistantIndex: number, result: Awaited<ReturnType<Router['route']>>): Map<number, MessageMeta> {
+  const usage = result.response?.usage;
+  const meta: MessageMeta = {
+    provider: result.provider,
+    model: result.model,
+    tokens: (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0),
+    trail: result.trail,
+  };
+  return new Map([[assistantIndex, meta]]);
 }
 
 async function handleChat(
@@ -266,10 +336,6 @@ async function handleChat(
   const ctx = await loadUserContext(userId);
   const db = getDb();
 
-  await logAudit(db, userId, 'chat_request', {
-    metadata: { model: requestBody.model, stream: body.stream ?? false },
-  });
-
   const wantsStream = body.stream === true;
   let usedKeyId: string | undefined;
 
@@ -279,12 +345,41 @@ async function handleChat(
     const usedKey = ctx.providerKeys.find((k) => k.providerId === result.provider);
     if (usedKey) {
       usedKeyId = usedKey.id;
-      recordKeyUsage(result.provider, usedKey.id);
-      await persistKeyUsage(db, usedKey.id, result.provider);
+      recordKeyUsage(result.provider, usedKey.id, result.model);
+    }
+
+    // Log routing decision with full provider/failover/token metadata
+    await logAudit(db, userId, 'chat_request', {
+      metadata: {
+        provider: result.provider,
+        model: result.model,
+        failoverFrom: result.failoverFrom ?? null,
+        attempts: result.attempts,
+        tokens: (result.response?.usage?.prompt_tokens ?? 0) + (result.response?.usage?.completion_tokens ?? 0),
+        stream: wantsStream,
+        attachmentTypes: requestBody.attachmentTypes ?? null,
+      },
+    });
+
+    // Record token usage from provider response
+    const totalTokens = (result.response?.usage?.prompt_tokens ?? 0) + (result.response?.usage?.completion_tokens ?? 0);
+    if (usedKey && totalTokens > 0) {
+      recordKeyTokens(result.provider, usedKey.id, result.model, totalTokens);
+    }
+
+    // Persist usage + tokens together after both are recorded
+    if (usedKey) {
+      await persistKeyUsage(db, usedKey.id, result.provider, result.model);
+    }
+
+    // Store live rate limit headers for the QuotaCapacityBar
+    const rateLimit = result.response?.precious?.rateLimit;
+    if (rateLimit && result.provider) {
+      setLiveRateLimit(userId, result.provider, rateLimit);
     }
 
     if (wantsStream && result.stream) {
-      setRoutingHeaders(c, result.provider, result.model, result.failoverFrom);
+      setRoutingHeaders(c, result.provider, result.model, result.failoverFrom, undefined, result.trail);
 
       if (panelMode) {
         c.header('Content-Type', 'text/plain; charset=utf-8');
@@ -292,8 +387,9 @@ async function handleChat(
         c.header('Connection', 'keep-alive');
 
         return stream(c, async (s) => {
+          const usageOut: { current: StreamUsage | null } = { current: null };
           let assistantText = '';
-          for await (const text of sseToPlainText(result.stream!)) {
+          for await (const text of sseToPlainText(result.stream!, usageOut)) {
             assistantText += text;
             await s.write(text);
           }
@@ -302,10 +398,23 @@ async function handleChat(
               'No response from the provider (empty stream). Often a rate limit on free models — try again or pick another model.';
             await s.write(assistantText);
           }
+
+          // Record token usage from provider metadata or estimate from output
+          let streamTokens = usageOut.current?.total_tokens ?? 0;
+          if (streamTokens === 0) {
+            const inputEstimate = estimateTokens(messages.map((m) => messageContentToText(m.content)).join(' '));
+            const outputEstimate = estimateTokens(assistantText);
+            streamTokens = inputEstimate + outputEstimate;
+          }
+          if (usedKey && streamTokens > 0) {
+            recordKeyTokens(result.provider, usedKey.id, result.model, streamTokens);
+            await persistKeyUsage(db, usedKey.id, result.provider, result.model);
+          }
+
           await saveChatMessages(userId, [
             ...messages,
             { role: 'assistant', content: assistantText },
-          ]);
+          ], buildMetaMap(messages.length, result));
         });
       }
 
@@ -313,9 +422,26 @@ async function handleChat(
       c.header('Cache-Control', 'no-cache');
       c.header('Connection', 'keep-alive');
 
+      const provider = result.provider;
+      const model = result.model;
+      const keyId = usedKeyId;
+      const dbRef = db;
+
       return stream(c, async (s) => {
-        for await (const chunk of result.stream!) {
+        const usageOut: { current: StreamUsage | null; outputText: string } = { current: null, outputText: '' };
+        for await (const chunk of interceptSSEUsage(result.stream!, usageOut)) {
           await s.write(chunk);
+        }
+
+        let streamTokens = usageOut.current?.total_tokens ?? 0;
+        if (streamTokens === 0) {
+          const inputEstimate = estimateTokens(messages.map((m) => messageContentToText(m.content)).join(' '));
+          const outputEstimate = estimateTokens(usageOut.outputText);
+          streamTokens = inputEstimate + outputEstimate;
+        }
+        if (keyId && streamTokens > 0) {
+          recordKeyTokens(provider, keyId, model, streamTokens);
+          await persistKeyUsage(dbRef, keyId, provider, model);
         }
       });
     }
@@ -329,7 +455,7 @@ async function handleChat(
       await saveChatMessages(userId, [
         ...messages,
         { role: 'assistant', content: text },
-      ]);
+      ], buildMetaMap(messages.length, result));
       c.header('Content-Type', 'text/plain; charset=utf-8');
       return c.text(text);
     }
@@ -340,6 +466,14 @@ async function handleChat(
       await updateKeyHealth(db, usedKeyId, healthFromError(err));
     }
     const message = err instanceof Error ? err.message : 'Routing failed';
+    await logAudit(db, userId, 'chat_request', {
+      metadata: {
+        error: message,
+        model: requestBody.model,
+        stream: wantsStream,
+        usedKeyId: usedKeyId ?? null,
+      },
+    });
     return c.json({ error: { message, type: 'api_error' } }, 502);
   }
 }
@@ -350,13 +484,70 @@ v1.get('/models', unifiedKeyAuth, async (c) => {
   const ctx = await loadUserContext(userId);
   return c.json({ object: 'list', data: listModels(ctx) });
 });
+v1.post('/embeddings', unifiedKeyAuth, async (c) => {
+  const userId = c.get('userId');
+  const body = await c.req.json<EmbeddingRequest>();
+
+  if (!body.input) {
+    return c.json({ error: { message: 'input is required' } }, 400);
+  }
+
+  const limiter = apiRateLimiter;
+  const limit = limiter.check(userId);
+  if (!limit.allowed) {
+    return c.json(
+      { error: { message: 'Rate limit exceeded', type: 'rate_limit_error' } },
+      429,
+    );
+  }
+
+  const requestBody: EmbeddingRequest = {
+    ...body,
+    model: body.model || AUTO_MODEL,
+    providerId: body.providerId,
+  };
+
+  const ctx = await loadUserContext(userId);
+  const db = getDb();
+  let usedKeyId: string | undefined;
+
+  try {
+    const result = await router.routeEmbedding(ctx, requestBody);
+
+    const usedKey = ctx.providerKeys.find((k) => k.providerId === result.provider);
+    if (usedKey) {
+      usedKeyId = usedKey.id;
+      recordKeyUsage(result.provider, usedKey.id, result.model);
+      await persistKeyUsage(db, usedKey.id, result.provider, result.model);
+    }
+
+    setRoutingHeaders(c, result.provider, result.model, result.failoverFrom);
+    return c.json(result.response);
+  } catch (err) {
+    if (usedKeyId) {
+      await updateKeyHealth(db, usedKeyId, healthFromError(err));
+    }
+    const message = err instanceof Error ? err.message : 'Embedding routing failed';
+    return c.json({ error: { message, type: 'api_error' } }, 502);
+  }
+});
 
 export const chatSession = new Hono<{ Variables: AppVariables }>();
 chatSession.post('/completions', localApiAuth, (c) => handleChat(c, true, false));
 chatSession.get('/messages', localApiAuth, async (c) => {
   const userId = c.get('userId');
   const messages = await loadChatMessages(userId);
-  return c.json({ messages });
+  const metaMap: Record<string, MessageMeta> = {};
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i] as { meta?: MessageMeta };
+    if (m.meta) {
+      metaMap[String(i)] = m.meta;
+    }
+  }
+  return c.json({
+    messages: messages.map(({ meta: _, ...rest }) => rest),
+    metaMap,
+  });
 });
 chatSession.delete('/messages', localApiAuth, async (c) => {
   const userId = c.get('userId');

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   PerKeyRateLedger,
   DEFAULT_KEY_RATE_LIMITS,
@@ -26,15 +26,16 @@ export async function hydrateKeyRateLedger(db: Db, userId: string): Promise<void
     .leftJoin(keyUsageCounters, eq(keyUsageCounters.providerKeyId, providerKeys.id))
     .where(eq(providerKeys.userId, userId));
 
-  const now = Date.now();
   for (const row of rows) {
-    const k = PerKeyRateLedger.key(row.providerId as ProviderId, '*', row.id);
     if (row.counters) {
+      const model = row.counters.model ?? '*';
+      const k = PerKeyRateLedger.key(row.providerId as ProviderId, model, row.id);
       ledger.load(k, {
         minuteCount: row.counters.minuteCount,
         minuteWindowStart: row.counters.minuteWindowStart,
         dayCount: row.counters.dayCount,
         dayWindowStart: row.counters.dayWindowStart,
+        tokensToday: row.counters.tokensToday ?? 0,
       });
     }
   }
@@ -44,24 +45,32 @@ export async function persistKeyUsage(
   db: Db,
   providerKeyId: string,
   providerId: ProviderId,
+  model: string,
 ): Promise<void> {
-  const k = PerKeyRateLedger.key(providerId, '*', providerKeyId);
+  const k = PerKeyRateLedger.key(providerId, model, providerKeyId);
   const snap = ledger.snapshot(k);
   if (!snap) return;
 
   const existing = await db
     .select()
     .from(keyUsageCounters)
-    .where(eq(keyUsageCounters.providerKeyId, providerKeyId))
+    .where(
+      and(
+        eq(keyUsageCounters.providerKeyId, providerKeyId),
+        eq(keyUsageCounters.model, model),
+      ),
+    )
     .limit(1);
 
   if (existing.length === 0) {
     await db.insert(keyUsageCounters).values({
       providerKeyId,
+      model,
       minuteCount: snap.minuteCount,
       minuteWindowStart: snap.minuteWindowStart,
       dayCount: snap.dayCount,
       dayWindowStart: snap.dayWindowStart,
+      tokensToday: snap.tokensToday ?? 0,
     });
   } else {
     await db
@@ -71,23 +80,33 @@ export async function persistKeyUsage(
         minuteWindowStart: snap.minuteWindowStart,
         dayCount: snap.dayCount,
         dayWindowStart: snap.dayWindowStart,
+        tokensToday: snap.tokensToday ?? 0,
       })
-      .where(eq(keyUsageCounters.providerKeyId, providerKeyId));
+      .where(
+        and(
+          eq(keyUsageCounters.providerKeyId, providerKeyId),
+          eq(keyUsageCounters.model, model),
+        ),
+      );
   }
 }
 
-export function recordKeyUsage(providerId: ProviderId, keyId: string): void {
-  ledger.record(PerKeyRateLedger.key(providerId, '*', keyId));
+export function recordKeyUsage(providerId: ProviderId, keyId: string, model: string): void {
+  ledger.record(PerKeyRateLedger.key(providerId, model, keyId));
+}
+
+export function recordKeyTokens(providerId: ProviderId, keyId: string, model: string, tokens: number): void {
+  ledger.recordTokens(PerKeyRateLedger.key(providerId, model, keyId), tokens);
 }
 
 export function buildKeyAvailabilityChecker(
   db: Db,
   healthMap: Map<string, KeyHealthStatus | null>,
-): (providerId: ProviderId, _model: string, keyId: string) => boolean {
-  return (providerId, _model, keyId) => {
+): (providerId: ProviderId, model: string, keyId: string) => boolean {
+  return (providerId, model, keyId) => {
     const health = healthMap.get(keyId);
     if (!isKeyHealthyForRouting(health ?? undefined)) return false;
-    return ledger.isAvailable(PerKeyRateLedger.key(providerId, '*', keyId));
+    return ledger.isAvailable(PerKeyRateLedger.key(providerId, model, keyId));
   };
 }
 

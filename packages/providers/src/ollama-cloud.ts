@@ -18,6 +18,7 @@ export const ollamaCloudMeta: ProviderMeta = {
   name: 'Ollama Cloud',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: true,
   defaultBaseUrl: ollamaCloudConfig.defaultBaseUrl,
   keySetupUrl: 'https://ollama.com/signin',
   keySetupHint: 'Free plan: 1 concurrent model, GPU-time quota. Sign in → API key in settings.',

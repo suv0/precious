@@ -17,6 +17,7 @@ export const nvidiaMeta: ProviderMeta = {
   name: 'NVIDIA NIM',
   riskLevel: 'high',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: nvidiaConfig.defaultBaseUrl,
   keySetupUrl: 'https://build.nvidia.com/',
   keySetupHint: 'Evaluation-only ToS. Generate API key at build.nvidia.com. Local-only in Precious.',

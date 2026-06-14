@@ -17,7 +17,10 @@ export const openaiMeta: ProviderMeta = {
   name: 'OpenAI',
   riskLevel: 'medium',
   cloudSafe: true,
+  freeTier: false,
   defaultBaseUrl: openaiConfig.defaultBaseUrl,
   keySetupUrl: 'https://platform.openai.com/api-keys',
-  keySetupHint: 'Sign in → API keys → Create new secret key. Keys start with sk-',
+  keySetupHint:
+    '💳 Requires billing — no free API tier. Add $5+ at platform.openai.com/account/billing, then create a new key. For free OpenAI models, use OpenRouter or GitHub Models instead.',
+
 };

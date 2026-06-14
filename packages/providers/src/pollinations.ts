@@ -18,6 +18,7 @@ export const pollinationsMeta: ProviderMeta = {
   name: 'Pollinations',
   riskLevel: 'medium',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: pollinationsConfig.defaultBaseUrl,
   keySetupUrl: 'https://pollinations.ai',
   keySetupLinkLabel: 'Pollinations docs →',

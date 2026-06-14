@@ -32,6 +32,7 @@ export function createPreciousApp(options: {
         'X-Precious-Provider',
         'X-Precious-Model',
         'X-Precious-Tokens',
+        'X-Precious-Trail',
         'X-Failover-From',
         'X-Routed-Via',
       ],

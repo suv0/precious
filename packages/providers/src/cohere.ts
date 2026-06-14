@@ -17,6 +17,7 @@ export const cohereMeta: ProviderMeta = {
   name: 'Cohere',
   riskLevel: 'high',
   cloudSafe: false,
+  freeTier: true,
   defaultBaseUrl: cohereConfig.defaultBaseUrl,
   keySetupUrl: 'https://dashboard.cohere.com/api-keys',
   keySetupHint:

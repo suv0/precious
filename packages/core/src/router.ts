@@ -70,6 +70,12 @@ export class Router {
     this.capsCheck = capsCheck ?? null;
   }
 
+  /** Called when a streaming attempt fails mid-generation — clears sticky and sets cooldown so the next route() call skips this key. */
+  streamFailed(userId: string, providerId: ProviderId, model: string, keyId: string): void {
+    this.stickySessions.delete(userId);
+    this.setCooldown(this.cooldownKey(providerId, model, keyId), Date.now());
+  }
+
   private cooldownKey(providerId: ProviderId, model: string, keyId: string): string {
     return `${providerId}:${model}:${keyId}`;
   }
@@ -89,7 +95,7 @@ export class Router {
     }
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
-      if (msg.includes('429') || msg.includes('rate limit')) return true;
+      if (msg.includes('429') || msg.includes('413') || msg.includes('404') || msg.includes('403') || msg.includes('rate limit') || msg.includes('quota') || msg.includes('tpm') || msg.includes('request too large') || msg.includes('does not exist') || msg.includes('not allowed to access')) return true;
       if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504')) return true;
       if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('econnreset')) return true;
     }
@@ -242,8 +248,9 @@ export class Router {
               trail: [{ provider: sticky.providerId, model: sticky.model, result: 'success' }],
             };
           } catch {
-            // Sticky session failed — clear and fall through
+            // Sticky session failed — clear, cooldown, and fall through
             this.stickySessions.delete(ctx.userId);
+            this.setCooldown(cdKey, Date.now());
           }
         } else {
           this.stickySessions.delete(ctx.userId);

@@ -45,6 +45,13 @@ export function ChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Auto-focus textarea when loading finishes (response received)
+  useEffect(() => {
+    if (!isLoading && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isLoading]);
+
   useEffect(() => {
     return () => {
       pending.forEach((p) => URL.revokeObjectURL(p.previewUrl));
@@ -158,6 +165,7 @@ export function ChatComposer({
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (isLoading) return;
       formRef.current?.requestSubmit();
     }
   };

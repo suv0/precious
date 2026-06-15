@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat, type Message } from 'ai/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChatMessageBubble } from '../components/ChatMessageBubble';
 import { ChatComposer } from '../components/ChatComposer';
@@ -54,6 +54,107 @@ function filesToFileList(files: File[]): FileList {
   return dt.files;
 }
 
+function ChatMessageList({
+  messages,
+  isLoading,
+  errorMessage,
+  awaitingReply,
+  messageMeta,
+  lastAssistantId,
+  streamingMeta,
+  chatErrorRef,
+  setChatError,
+  reload,
+}: {
+  messages: Message[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  awaitingReply: boolean;
+  messageMeta: Record<string, ChatResponseMeta>;
+  lastAssistantId: string | undefined;
+  streamingMeta: ChatResponseMeta | null;
+  chatErrorRef: React.MutableRefObject<string | null>;
+  setChatError: (err: string | null) => void;
+  reload: () => void;
+}) {
+  const metaForMessage = useCallback(
+    (m: (typeof messages)[number]): ChatResponseMeta | undefined => {
+      if (m.role !== 'assistant') return undefined;
+      if (messageMeta[m.id]) return messageMeta[m.id];
+      if (m.id === lastAssistantId && streamingMeta) return streamingMeta;
+      return undefined;
+    },
+    [messageMeta, lastAssistantId, streamingMeta],
+  );
+
+  if (messages.length === 0 && !isLoading) {
+    return (
+      <p className="text-center text-precious-muted italic py-20 font-display">
+        My precious tokens.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {messages.map((m) => (
+        <ChatMessageBubble
+          key={m.id}
+          role={m.role}
+          content={m.content}
+          meta={metaForMessage(m)}
+          attachments={m.experimental_attachments}
+        />
+      ))}
+      {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+        <ChatTypingIndicator />
+      )}
+      {awaitingReply && !errorMessage && (
+        <div className="flex items-center gap-3 text-sm">
+          <p className="text-precious-muted text-xs">No reply yet.</p>
+          <button
+            type="button"
+            onClick={() => {
+              chatErrorRef.current = null;
+              setChatError(null);
+              reload();
+            }}
+            className="text-precious-gold hover:underline text-xs font-display"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {errorMessage && (
+        <div className="space-y-2">
+          <ChatErrorBanner message={errorMessage} />
+          <button
+            type="button"
+            onClick={() => {
+              chatErrorRef.current = null;
+              setChatError(null);
+              reload();
+            }}
+            disabled={isLoading}
+            className="text-sm text-precious-gold hover:underline disabled:opacity-50 font-display"
+          >
+            Retry last message
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+const MemoizedChatMessageList = memo(ChatMessageList, (prev, next) =>
+  prev.messages.length === next.messages.length &&
+  prev.messages[prev.messages.length - 1]?.content === next.messages[next.messages.length - 1]?.content &&
+  prev.isLoading === next.isLoading &&
+  prev.errorMessage === next.errorMessage &&
+  prev.awaitingReply === next.awaitingReply &&
+  prev.streamingMeta === next.streamingMeta,
+);
+
 function ChatPanelInner({
   apiBase,
   chatId,
@@ -89,6 +190,7 @@ function ChatPanelInner({
   const [currentConvId, setCurrentConvId] = useState<string | null>(conversationId);
   const pendingMetaRef = useRef<ChatResponseMeta | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatErrorRef = useRef<string | null>(null);
 
   const modelOptions = useMemo(() => dedupeModelOptions(models), [models]);
   const attachmentCaps = useMemo(
@@ -118,7 +220,9 @@ function ChatPanelInner({
     }),
     onResponse: (res) => {
       if (!res.ok) {
-        setChatError(`Request failed (${res.status}). See error below or try Keys → test your OpenRouter key.`);
+        const msg = `Request failed (${res.status}). See error below or try Keys → test your OpenRouter key.`;
+        chatErrorRef.current = msg;
+        setChatError(msg);
       }
       const meta = metaFromHeaders(res);
       if (meta.provider || meta.model || meta.tokens) {
@@ -141,11 +245,15 @@ function ChatPanelInner({
       }
     },
     onError: (err) => {
-      setChatError(err.message || 'Could not get a reply');
+      if (chatErrorRef.current) return;
+      chatErrorRef.current = err.message || 'Could not get a reply';
+      setChatError(chatErrorRef.current);
     },
     onFinish: (message) => {
+      if (chatErrorRef.current) return;
       if (!message.content?.trim()) {
-        setChatError('The provider returned an empty reply. Try Retry or another model.');
+        chatErrorRef.current = 'The provider returned an empty reply. Try Retry or another model.';
+        setChatError(chatErrorRef.current);
       } else {
         setChatError(null);
       }
@@ -160,24 +268,19 @@ function ChatPanelInner({
     },
   });
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
-
-  const metaForMessage = (m: (typeof messages)[number]): ChatResponseMeta | undefined => {
-    if (m.role !== 'assistant') return undefined;
-    if (messageMeta[m.id]) return messageMeta[m.id];
-    if (m.id === lastAssistantId && streamingMeta) return streamingMeta;
-    return undefined;
-  };
 
   const lastMessage = messages[messages.length - 1];
   const awaitingReply = !isLoading && lastMessage?.role === 'user';
   const errorMessage = chatError ?? error?.message ?? null;
 
   const onComposerSubmit = (files: File[]) => {
+    chatErrorRef.current = null;
     setChatError(null);
     const fileList = files.length > 0 ? filesToFileList(files) : undefined;
     handleSubmit(undefined, {
@@ -223,54 +326,18 @@ function ChatPanelInner({
       <QuotaCapacityBar summary={quotaSummary} compact />
 
       <div className="flex-1 min-h-0 overflow-y-auto space-y-5 mb-4 precious-card p-4 scroll-smooth">
-        {messages.length === 0 && !isLoading && (
-          <p className="text-center text-precious-muted italic py-20 font-display">
-            My precious tokens.
-          </p>
-        )}
-        {messages.map((m) => (
-          <ChatMessageBubble
-            key={m.id}
-            role={m.role}
-            content={m.content}
-            meta={metaForMessage(m)}
-            attachments={m.experimental_attachments}
-          />
-        ))}
-        {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-          <ChatTypingIndicator />
-        )}
-        {awaitingReply && !errorMessage && (
-          <div className="flex items-center gap-3 text-sm">
-            <p className="text-precious-muted text-xs">No reply yet.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setChatError(null);
-                reload();
-              }}
-              className="text-precious-gold hover:underline text-xs font-display"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-        {errorMessage && (
-          <div className="space-y-2">
-            <ChatErrorBanner message={errorMessage} />
-            <button
-              type="button"
-              onClick={() => {
-                setChatError(null);
-                reload();
-              }}
-              disabled={isLoading}
-              className="text-sm text-precious-gold hover:underline disabled:opacity-50 font-display"
-            >
-              Retry last message
-            </button>
-          </div>
-        )}
+        <MemoizedChatMessageList
+          messages={messages}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+          awaitingReply={awaitingReply}
+          messageMeta={messageMeta}
+          lastAssistantId={lastAssistantId}
+          streamingMeta={streamingMeta}
+          chatErrorRef={chatErrorRef}
+          setChatError={setChatError}
+          reload={reload}
+        />
         <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
       </div>
 
@@ -358,30 +425,42 @@ export function ChatPage() {
     }
   }, [apiBase]);
 
-  // On conversation created by server, update URL and refresh sidebar
-  const handleConversationCreated = (cid: string) => {
-    convIdRef.current = cid;
-    setConversationId(cid);
-    window.history.replaceState(null, '', `/chat?conversationId=${cid}`);
-    window.dispatchEvent(new CustomEvent('precious:refresh-conversations'));
-  };
+  // On mount: load models, then if URL has conversationId, load history.
+  // If no conversationId, show empty ready state (user starts fresh).
+  // Does NOT re-run on our own URL updates (skipPendingRef guards).
+  const skipPendingRef = useRef(false);
+  const urlCidRef = useRef<string | null>(null);
 
-  // On mount: load models, then if URL has conversationId, load history
-  // If no conversationId, show empty ready state (user starts fresh)
   useEffect(() => {
     loadModels();
     const cid = searchParams.get('conversationId');
-    if (cid) {
+    if (skipPendingRef.current) {
+      skipPendingRef.current = false;
+      return;
+    }
+    if (cid && cid !== urlCidRef.current) {
+      urlCidRef.current = cid;
       convIdRef.current = cid;
       setConversationId(cid);
+      setHistoryReady(false);
       loadHistory(cid);
-    } else {
+    } else if (!cid) {
+      urlCidRef.current = null;
+      convIdRef.current = null;
       setConversationId(null);
       setHistoryReady(true);
       setInitialMessages([]);
       setHistoryMeta({});
     }
   }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleConversationCreated = (cid: string) => {
+    convIdRef.current = cid;
+    urlCidRef.current = cid;
+    skipPendingRef.current = true;
+    window.history.replaceState(null, '', `/chat?conversationId=${cid}`);
+    window.dispatchEvent(new CustomEvent('precious:refresh-conversations'));
+  };
 
   // Chat complete — trigger sidebar refresh
   const handleChatComplete = () => {

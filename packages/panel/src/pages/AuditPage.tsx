@@ -22,7 +22,17 @@ function actionLabel(action: string, meta: Record<string, unknown> | null): stri
     const provider = meta?.provider as string | undefined;
     const model = meta?.model as string | undefined;
     const error = meta?.error as string | undefined;
+    const streamFailed = meta?.streamFailed as boolean | undefined;
     if (error) return `Chat failed — ${error.slice(0, 60)}`;
+    if (streamFailed) {
+      const streamFailedProvider = meta?.streamFailedProvider as string | undefined;
+      const streamFailedModel = meta?.streamFailedModel as string | undefined;
+      const streamError = meta?.streamError as string | undefined;
+      if (provider && model && streamFailedProvider) {
+        return `${streamFailedProvider} ✗ → ${provider} · ${model}`;
+      }
+      return `Stream retry to ${provider} · ${model}`;
+    }
     if (provider && model) return `${provider} · ${model}`;
     return 'Chat request';
   }
@@ -39,10 +49,12 @@ function routeDetail(meta: Record<string, unknown> | null): string {
   const failoverFrom = meta.failoverFrom as string | undefined;
   const attempts = meta.attempts as number | undefined;
   const tokens = meta.tokens as number | undefined;
+  const streamError = meta.streamError as string | undefined;
   const parts: string[] = [];
   if (failoverFrom) parts.push(`failover from ${failoverFrom}`);
   if (attempts && attempts > 1) parts.push(`${attempts} attempts`);
   if (tokens) parts.push(`${tokens.toLocaleString()} tokens`);
+  if (streamError) parts.push(`error: ${streamError}`);
   return parts.join(' · ');
 }
 

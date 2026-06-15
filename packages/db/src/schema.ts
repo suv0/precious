@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -116,7 +116,9 @@ export const chatMessages = sqliteTable('chat_messages', {
   content: text('content'),
   meta: text('meta'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-});
+}, (table) => ({
+  lookupIdx: index('idx_chat_messages_lookup').on(table.userId, table.conversationId, table.createdAt),
+}));
 
 export const oauthAccounts = sqliteTable('oauth_accounts', {
   id: text('id').primaryKey(),

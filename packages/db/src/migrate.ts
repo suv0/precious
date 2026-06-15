@@ -89,6 +89,7 @@ export const MIGRATION_SQL = `
     provider_account_id TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_lookup ON chat_messages (user_id, conversation_id, created_at);
 `;
 
 const LEGACY_ALTERS = [

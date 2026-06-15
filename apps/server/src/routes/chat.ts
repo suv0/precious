@@ -236,7 +236,7 @@ async function* interceptSSEUsage(
 
 /** OpenAI SSE chunks → plain text for panel useChat (streamProtocol: text).
  *  Also collects any usage metadata found in the stream chunks. */
-async function* sseToPlainText(
+export async function* sseToPlainText(
   stream: AsyncGenerator<string, void, unknown>,
   usageOut: { current: StreamUsage | null },
 ): AsyncGenerator<string, void, unknown> {
@@ -346,9 +346,11 @@ async function handleChat(
   }
 
   // Panel mode: auto-create conversation on first request if none provided
+  let createdConversationId: string | undefined;
   if (panelMode && !conversationId) {
     const entry = await createConversation(userId);
     conversationId = entry.id;
+    createdConversationId = conversationId;
   }
 
   // Auto-title from first user message if still "New Chat"
@@ -388,28 +390,31 @@ async function handleChat(
       recordKeyUsage(result.provider, usedKey.id, result.model);
     }
 
-    // Log routing decision with full provider/failover/token metadata
-    await logAudit(db, userId, 'chat_request', {
-      metadata: {
-        provider: result.provider,
-        model: result.model,
-        failoverFrom: result.failoverFrom ?? null,
-        attempts: result.attempts,
-        tokens: (result.response?.usage?.prompt_tokens ?? 0) + (result.response?.usage?.completion_tokens ?? 0),
-        stream: wantsStream,
-        attachmentTypes: requestBody.attachmentTypes ?? null,
-      },
-    });
+    // For streaming panel requests, defer the audit log until the stream completes
+    // (the initial routing may fail mid-stream and trigger a retry to a different provider)
+    if (!wantsStream || !panelMode) {
+      await logAudit(db, userId, 'chat_request', {
+        metadata: {
+          provider: result.provider,
+          model: result.model,
+          failoverFrom: result.failoverFrom ?? null,
+          attempts: result.attempts,
+          tokens: (result.response?.usage?.prompt_tokens ?? 0) + (result.response?.usage?.completion_tokens ?? 0),
+          stream: wantsStream,
+          attachmentTypes: requestBody.attachmentTypes ?? null,
+        },
+      });
+    }
 
-    // Record token usage from provider response
+    // Record token usage from provider response (fire-and-forget for streaming)
     const totalTokens = (result.response?.usage?.prompt_tokens ?? 0) + (result.response?.usage?.completion_tokens ?? 0);
     if (usedKey && totalTokens > 0) {
       recordKeyTokens(result.provider, usedKey.id, result.model, totalTokens);
     }
 
-    // Persist usage + tokens together after both are recorded
+    // Persist usage — fire-and-forget so we don't block the stream
     if (usedKey) {
-      await persistKeyUsage(db, usedKey.id, result.provider, result.model);
+      persistKeyUsage(db, usedKey.id, result.provider, result.model).catch(() => {});
     }
 
     // Store live rate limit headers for the QuotaCapacityBar
@@ -429,10 +434,66 @@ async function handleChat(
         return stream(c, async (s) => {
           const usageOut: { current: StreamUsage | null } = { current: null };
           let assistantText = '';
-          for await (const text of sseToPlainText(result.stream!, usageOut)) {
-            assistantText += text;
-            await s.write(text);
+          let finalProvider = result.provider;
+          let finalModel = result.model;
+          let finalFailoverFrom = result.failoverFrom;
+          let finalAttempts = result.attempts;
+          let finalTrail = result.trail;
+          let finalUsage: StreamUsage | null = null;
+          let streamFailed = false;
+          let streamFailedProvider: string | null = null;
+          let streamFailedModel: string | null = null;
+          let streamError: string | null = null;
+
+          try {
+            for await (const text of sseToPlainText(result.stream!, usageOut)) {
+              assistantText += text;
+              await s.write(text);
+            }
+            finalUsage = usageOut.current;
+          } catch (streamErr) {
+            streamFailed = true;
+            streamFailedProvider = result.provider;
+            streamFailedModel = result.model;
+            streamError = streamErr instanceof Error ? streamErr.message.slice(0, 200) : 'Provider stream error';
+
+            // Mid-stream error — mark failed key and retry with next provider
+            if (usedKey) {
+              router.streamFailed(userId, result.provider, result.model, usedKey.id);
+            }
+
+            try {
+              const retryResult = await router.route(ctx, requestBody, false);
+              if (retryResult.response) {
+                const retryText = messageContentToText(retryResult.response.choices[0]?.message?.content);
+                await s.write(retryText);
+                assistantText = retryText;
+                finalProvider = retryResult.provider;
+                finalModel = retryResult.model;
+                finalFailoverFrom = retryResult.failoverFrom ?? result.provider;
+                finalAttempts = retryResult.attempts;
+                finalTrail = retryResult.trail;
+                finalUsage = retryResult.response.usage ?? null;
+
+                // Update usedKey to the retry key so bottom block records correctly
+                const retryKey = ctx.providerKeys.find((k) => k.providerId === retryResult.provider);
+                if (retryKey) {
+                  usedKeyId = retryKey.id;
+                  recordKeyUsage(retryResult.provider, retryKey.id, retryResult.model);
+                }
+              } else {
+                const msg = streamErr instanceof Error ? streamErr.message : 'Provider stream error';
+                assistantText = msg;
+                await s.write(msg);
+              }
+            } catch (retryErr) {
+              // retryErr will be a RouterError with the full exhaustion message
+              const msg = retryErr instanceof Error ? retryErr.message : 'Provider stream error';
+              assistantText = msg;
+              await s.write(msg);
+            }
           }
+
           if (!assistantText.trim()) {
             assistantText =
               'No response from the provider (empty stream). Often a rate limit on free models — try again or pick another model.';
@@ -440,21 +501,38 @@ async function handleChat(
           }
 
           // Record token usage from provider metadata or estimate from output
-          let streamTokens = usageOut.current?.total_tokens ?? 0;
+          let streamTokens = finalUsage?.total_tokens ?? 0;
           if (streamTokens === 0) {
             const inputEstimate = estimateTokens(messages.map((m) => messageContentToText(m.content)).join(' '));
             const outputEstimate = estimateTokens(assistantText);
             streamTokens = inputEstimate + outputEstimate;
           }
-          if (usedKey && streamTokens > 0) {
-            recordKeyTokens(result.provider, usedKey.id, result.model, streamTokens);
-            await persistKeyUsage(db, usedKey.id, result.provider, result.model);
+          if (usedKeyId && streamTokens > 0) {
+            recordKeyTokens(finalProvider, usedKeyId, finalModel, streamTokens);
+            await persistKeyUsage(db, usedKeyId, finalProvider, finalModel);
           }
+
+          // Log the final audit entry for streaming panel requests (deferred from above)
+          await logAudit(db, userId, 'chat_request', {
+            metadata: {
+              provider: finalProvider,
+              model: finalModel,
+              failoverFrom: finalFailoverFrom ?? null,
+              attempts: finalAttempts,
+              tokens: streamTokens,
+              stream: true,
+              streamFailed,
+              streamFailedProvider,
+              streamFailedModel,
+              streamError,
+              routeTrail: finalTrail,
+            },
+          });
 
           await saveChatMessages(userId, conversationId!, [
             ...messages,
             { role: 'assistant', content: assistantText },
-          ], buildMetaMap(messages.length, result));
+          ], buildMetaMap(messages.length, { provider: finalProvider, model: finalModel, attempts: finalAttempts, failoverFrom: finalFailoverFrom, trail: finalTrail, response: undefined, stream: undefined }));
         });
       }
 
@@ -506,6 +584,12 @@ async function handleChat(
       await updateKeyHealth(db, usedKeyId, healthFromError(err));
     }
     const message = err instanceof Error ? err.message : 'Routing failed';
+
+    // Clean up orphan conversation created for this request
+    if (createdConversationId) {
+      try { await deleteConversation(createdConversationId); } catch { /* best effort */ }
+    }
+
     await logAudit(db, userId, 'chat_request', {
       metadata: {
         error: message,

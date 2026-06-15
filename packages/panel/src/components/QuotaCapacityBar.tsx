@@ -27,7 +27,7 @@ export function QuotaCapacityBar({
     >
       <div className="flex items-center justify-between gap-2 text-[11px] text-precious-muted">
         <span className="font-display tracking-wide text-precious-muted/90">
-          Routing budget · {summary.totalTokensToday.toLocaleString()} / {summary.totalTokenBudget.toLocaleString()} today
+          Token budgets · {summary.totalTokensToday.toLocaleString()} / {summary.totalTokenBudget.toLocaleString()} today
         </span>
         {!compact && summary.resetsDayAt && (
           <span>{formatReset(summary.resetsDayAt)}</span>

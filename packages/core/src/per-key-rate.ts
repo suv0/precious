@@ -38,12 +38,16 @@ export class PerKeyRateLedger {
   }
 
   isAvailable(key: string, now = Date.now()): boolean {
-    const bucket = this.getOrCreateBucket(key, now);
-    this.rollWindows(bucket, now);
+    const bucket = this.buckets.get(key);
+    if (bucket && now - bucket.minuteWindowStart >= 60_000 && now - bucket.dayWindowStart >= 86_400_000) {
+      this.buckets.delete(key);
+    }
+    const b = this.getOrCreateBucket(key, now);
+    this.rollWindows(b, now);
     const rpmLimit = this.config.requestsPerMinute;
     const rpdLimit = this.config.requestsPerDay;
-    if (bucket.minuteCount >= rpmLimit) return false;
-    if (rpdLimit !== undefined && bucket.dayCount >= rpdLimit) return false;
+    if (b.minuteCount >= rpmLimit) return false;
+    if (rpdLimit !== undefined && b.dayCount >= rpdLimit) return false;
     return true;
   }
 

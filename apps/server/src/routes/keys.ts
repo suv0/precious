@@ -88,8 +88,8 @@ keys.post('/', async (c) => {
     cloudTrustAcknowledged?: boolean;
   }>();
 
-  if (!body.providerId || !body.label) {
-    return c.json({ error: 'providerId and label are required' }, 400);
+  if (!body.providerId) {
+    return c.json({ error: 'providerId is required' }, 400);
   }
 
   const meta = getProviderMeta(body.providerId);
@@ -103,6 +103,7 @@ keys.post('/', async (c) => {
   }
 
   const apiKey = rawKey || KEYLESS_SENTINEL;
+  const label = body.label?.trim() || `My ${meta.name} key`;
 
   const [userSettings] = await db
     .select()
@@ -110,7 +111,13 @@ keys.post('/', async (c) => {
     .where(eq(settings.userId, userId))
     .limit(1);
 
-  if (!userSettings?.tosAcknowledged && !body.tosAcknowledged) {
+  // In local mode with no password and no cloud mode, auto-acknowledge TOS.
+  const isLocalNoPassword = !process.env.PRECIOUS_CLOUD_MODE && !process.env.PRECIOUS_LOCAL_PASSWORD;
+  if (isLocalNoPassword && !userSettings?.tosAcknowledged) {
+    await patchUserSettings(userId, { tosAcknowledged: true });
+  }
+
+  if (!isLocalNoPassword && !userSettings?.tosAcknowledged && !body.tosAcknowledged) {
     return c.json(
       {
         error: 'Terms of Service acknowledgment required before adding keys',
@@ -151,7 +158,7 @@ keys.post('/', async (c) => {
     id,
     userId,
     providerId: body.providerId,
-    label: body.label,
+    label,
     encryptedKey,
     customBaseUrl: body.customBaseUrl?.trim() || null,
     healthStatus: 'unknown',
@@ -165,28 +172,42 @@ keys.post('/', async (c) => {
 
   const hasProvider = existingChain.some((r) => r.providerId === body.providerId);
   if (!hasProvider) {
-    const maxPriority = existingChain.length;
-    const defaultModel = getDefaultModels(body.providerId)[0] ?? 'default';
-    await db.insert(fallbackChain).values({
-      id: uuidv4(),
-      userId,
-      providerId: body.providerId,
-      model: defaultModel,
-      priority: maxPriority,
-      enabled: true,
-    });
+    let nextPriority = existingChain.length;
+    const defaultModels = getDefaultModels(body.providerId);
+    if (defaultModels.length > 0) {
+      for (const model of defaultModels) {
+        await db.insert(fallbackChain).values({
+          id: uuidv4(),
+          userId,
+          providerId: body.providerId,
+          model,
+          priority: nextPriority,
+          enabled: true,
+        });
+        nextPriority += 1;
+      }
+    } else {
+      await db.insert(fallbackChain).values({
+        id: uuidv4(),
+        userId,
+        providerId: body.providerId,
+        model: 'default',
+        priority: nextPriority,
+        enabled: true,
+      });
+    }
   }
 
   await logAudit(db, userId, 'key_created', {
     resourceType: 'provider_key',
     resourceId: id,
-    metadata: { providerId: body.providerId, label: body.label },
+    metadata: { providerId: body.providerId, label },
   });
 
   return c.json({
     id,
     providerId: body.providerId,
-    label: body.label,
+    label,
     meta,
   });
 });

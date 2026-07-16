@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-export default function HomePage() {
-  redirect('/chat');
-}
+export { WelcomePage as default } from '@precious/panel';

@@ -1,6 +1,7 @@
 export { PanelProvider, usePanelConfig } from './config';
 export type { PanelConfig, LegalLinks } from './config';
 export { ChatPage } from './pages/ChatPage';
+export { WelcomePage } from './pages/WelcomePage';
 export { KeysPage } from './pages/KeysPage';
 export { AuditPage } from './pages/AuditPage';
 export { PanelLayout } from './components/PanelLayout';

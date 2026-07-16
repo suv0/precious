@@ -1,6 +1,8 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { Router, RouterError } from './router.js';
+import { PerKeyRateLedger } from './per-key-rate.js';
+import { DEFAULT_KEY_RATE_LIMITS } from './key-health.js';
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -540,5 +542,196 @@ describe('Sticky sessions', () => {
     const result2 = await router.route(makeContext(), request, false);
     assert.equal(result2.provider, 'mistral');
     assert.equal(mistralCalls, 1);
+  });
+});
+
+describe('Pinned provider cooldown bypass', () => {
+  it('bypasses cooldown when provider is explicitly pinned', async () => {
+    let groqCalled = false;
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        groqCalled = true;
+        return okResponse('groq', 'llama-groq');
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    const router = new Router([groqAdapter]);
+
+    // Pre-set cooldown on groq key
+    const cdKey = 'groq:llama-groq:key-groq';
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(cdKey, {
+      until: Date.now() + 30_000,
+    });
+
+    const ctx = makeContext();
+    ctx.fallbackChain = [{ providerId: 'groq', model: 'llama-groq', priority: 0, enabled: true }];
+    const request: ChatCompletionRequest = {
+      model: 'llama-groq',
+      providerId: 'groq',
+      messages: FULL_MESSAGES,
+    };
+
+    const result = await router.route(ctx, request, false);
+    assert.equal(result.provider, 'groq');
+    assert.ok(groqCalled);
+  });
+
+  it('still respects cooldown when no provider is pinned', async () => {
+    let mistralCalled = false;
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => okResponse('groq', 'llama-groq')),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+    const mistralAdapter = {
+      id: 'mistral' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        mistralCalled = true;
+        return okResponse('mistral', 'mistral-small');
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    const router = new Router([groqAdapter, mistralAdapter]);
+
+    // Cooldown the ONLY key for groq
+    const cdKey = 'groq:llama-groq:key-groq';
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(cdKey, {
+      until: Date.now() + 30_000,
+    });
+
+    const ctx = makeContext();
+    const request: ChatCompletionRequest = {
+      model: 'auto',
+      messages: FULL_MESSAGES,
+    };
+
+    const result = await router.route(ctx, request, false);
+    assert.equal(result.provider, 'mistral');
+    assert.ok(mistralCalled);
+  });
+});
+
+describe('All-cooldown last-resort retry', () => {
+  it('force-tries the least-cooldowned key when all keys are on cooldown', async () => {
+    let groqCalls = 0;
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        groqCalls += 1;
+        return okResponse('groq', 'llama-groq');
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    let mistralCalls = 0;
+    const mistralAdapter = {
+      id: 'mistral' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        mistralCalls += 1;
+        throw new RouterError('429 rate limit', true);
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    const router = new Router([groqAdapter, mistralAdapter]);
+
+    // Cooldown both keys — groq cooldown expires sooner
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(
+      'groq:llama-groq:key-groq',
+      { until: Date.now() + 10_000 },
+    );
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(
+      'mistral:mistral-small:key-mistral',
+      { until: Date.now() + 20_000 },
+    );
+
+    const ctx = makeContext();
+    const request: ChatCompletionRequest = {
+      model: 'auto',
+      messages: FULL_MESSAGES,
+    };
+
+    // groq should be picked (earliest expiry) and succeed
+    const result = await router.route(ctx, request, false);
+    assert.equal(result.provider, 'groq');
+    assert.equal(groqCalls, 1);
+    assert.equal(mistralCalls, 0);
+  });
+
+  it('throws with all-cooldown error message when last-resort also fails', async () => {
+    const groqAdapter = {
+      id: 'groq' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        throw new RouterError('429 rate limit', true);
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    const mistralAdapter = {
+      id: 'mistral' as ProviderId,
+      chatCompletion: mock.fn(async () => {
+        throw new RouterError('429 rate limit', true);
+      }),
+      streamChatCompletion: async function* () { yield ''; },
+    };
+
+    const router = new Router([groqAdapter, mistralAdapter]);
+
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(
+      'groq:llama-groq:key-groq',
+      { until: Date.now() + 10_000 },
+    );
+    (router as unknown as { cooldowns: Map<string, { until: number }> }).cooldowns.set(
+      'mistral:mistral-small:key-mistral',
+      { until: Date.now() + 20_000 },
+    );
+
+    const ctx = makeContext();
+    const request: ChatCompletionRequest = {
+      model: 'auto',
+      messages: FULL_MESSAGES,
+    };
+
+    await assert.rejects(
+      () => router.route(ctx, request, false),
+      /temporarily unavailable/,
+    );
+  });
+});
+
+describe('PerKeyRateLedger stale entry pruning', () => {
+  it('prunes entries whose windows have fully expired', () => {
+    const ledger = new PerKeyRateLedger(DEFAULT_KEY_RATE_LIMITS);
+    const now = Date.now();
+
+    // Load an entry with a day window from 25 hours ago and at max requests
+    const staleDayStart = now - 25 * 60 * 60 * 1000;
+    ledger.load('test:model:key1', {
+      minuteCount: 0,
+      minuteWindowStart: staleDayStart,
+      dayCount: 15000,
+      dayWindowStart: staleDayStart,
+      tokensToday: 0,
+    });
+
+    assert.equal(ledger.isAvailable('test:model:key1', now), true);
+  });
+
+  it('keeps active entries that are within window', () => {
+    const ledger = new PerKeyRateLedger(DEFAULT_KEY_RATE_LIMITS);
+    const now = Date.now();
+
+    ledger.load('test:model:key1', {
+      minuteCount: 30, // at RPM limit
+      minuteWindowStart: now - 30_000, // still within minute window
+      dayCount: 14999,
+      dayWindowStart: now - 12 * 60 * 60 * 1000, // within day window
+      tokensToday: 0,
+    });
+
+    assert.equal(ledger.isAvailable('test:model:key1', now), false);
   });
 });

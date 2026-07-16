@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { PanelProvider, type PanelConfig } from '@precious/panel';
 import { ShellLayout } from './ShellLayout';
 
@@ -10,9 +11,15 @@ const localPanelConfig: PanelConfig = {
 };
 
 export function LocalPanelProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
   return (
     <PanelProvider config={localPanelConfig}>
-      <ShellLayout>{children}</ShellLayout>
+      {pathname === '/' ? (
+        <>{children}</>
+      ) : (
+        <ShellLayout>{children}</ShellLayout>
+      )}
     </PanelProvider>
   );
 }

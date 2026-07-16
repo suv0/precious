@@ -8,6 +8,7 @@ import type {
   RouteAttempt,
   RouterContext,
 } from './types.js';
+import type { GuardrailAdapter, GuardContext } from './guards.js';
 
 export interface ProviderAdapter {
   id: ProviderId;
@@ -61,13 +62,16 @@ export class Router {
   private cooldowns = new Map<string, CooldownState>();
   private capsCheck: ((providerId: ProviderId, model: string) => { images: boolean; documents: boolean }) | null = null;
   private stickySessions = new Map<string, StickySession>();
+  private guards: GuardrailAdapter[] = [];
 
   constructor(
     adapters: ProviderAdapter[],
     capsCheck?: (providerId: ProviderId, model: string) => { images: boolean; documents: boolean },
+    guards: GuardrailAdapter[] = [],
   ) {
     this.adapters = new Map(adapters.map((a) => [a.id, a]));
     this.capsCheck = capsCheck ?? null;
+    this.guards = guards;
   }
 
   /** Called when a streaming attempt fails mid-generation — clears sticky and sets cooldown so the next route() call skips this key. */
@@ -170,6 +174,28 @@ export class Router {
     };
   }
 
+  private findLeastCooldownedEntry(
+    chainToTry: FallbackChainEntry[],
+    ctx: RouterContext,
+    now: number,
+  ): { providerId: ProviderId; model: string; keyId: string; cdKey: string } | null {
+    let best: { providerId: ProviderId; model: string; keyId: string; cdKey: string } | null = null;
+    let earliestUntil = Infinity;
+
+    for (const entry of chainToTry) {
+      const keys = ctx.providerKeys.filter((k) => k.providerId === entry.providerId);
+      for (const keyRecord of keys) {
+        const cdKey = this.cooldownKey(entry.providerId, entry.model, keyRecord.id);
+        const state = this.cooldowns.get(cdKey);
+        if (state && state.until < earliestUntil) {
+          earliestUntil = state.until;
+          best = { providerId: entry.providerId, model: entry.model, keyId: keyRecord.id, cdKey };
+        }
+      }
+    }
+    return best;
+  }
+
   async route(
     ctx: RouterContext,
     request: ChatCompletionRequest,
@@ -177,6 +203,15 @@ export class Router {
   ): Promise<RouterResult> {
     const maxAttempts = ctx.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     const fullRequest = this.freezeRequest(request);
+    
+    // Run Input Guards
+    const guardCtx: GuardContext = { userId: ctx.userId };
+    for (const guard of this.guards) {
+      if (guard.validateInput) {
+        await guard.validateInput(fullRequest, guardCtx);
+      }
+    }
+
     const attachmentFilter = fullRequest.hasAttachments && fullRequest.attachmentTypes?.length
       ? {
           needsImages: fullRequest.attachmentTypes.includes('image'),
@@ -236,6 +271,14 @@ export class Router {
             }
 
             const response = await adapter.chatCompletion(apiKey, sticky.model, providerRequest, keyRecord.customBaseUrl);
+            
+            // Run Output Guards
+            for (const guard of this.guards) {
+              if (guard.validateOutput) {
+                await guard.validateOutput(response, guardCtx);
+              }
+            }
+            
             this.stickySessions.set(ctx.userId, { ...sticky, pinnedUntil: Date.now() + STICKY_DURATION_MS });
             return {
               response: {
@@ -247,7 +290,11 @@ export class Router {
               attempts: 1,
               trail: [{ provider: sticky.providerId, model: sticky.model, result: 'success' }],
             };
-          } catch {
+          } catch (err) {
+            // If it's a Guardrail error, bubble it up immediately, don't failover
+            if (err instanceof RouterError && err.retryable === false && err.message.includes('Guardrail')) {
+              throw err;
+            }
             // Sticky session failed — clear, cooldown, and fall through
             this.stickySessions.delete(ctx.userId);
             this.setCooldown(cdKey, Date.now());
@@ -266,6 +313,7 @@ export class Router {
     const trail: RouteAttempt[] = [];
     let lastFailedProvider: ProviderId | undefined;
     const pinBypassHealth = Boolean(fullRequest.providerId);
+    const pinBypassCooldown = Boolean(fullRequest.providerId);
 
     for (const entry of chainToTry) {
       const adapter = this.adapters.get(entry.providerId);
@@ -285,7 +333,7 @@ export class Router {
       for (const keyRecord of keys) {
         const model = entry.model;
         const cdKey = this.cooldownKey(entry.providerId, model, keyRecord.id);
-        if (this.isOnCooldown(cdKey, now)) {
+        if (!pinBypassCooldown && this.isOnCooldown(cdKey, now)) {
           errors.push(`${entry.providerId}/${model}: cooling down after a recent error`);
           trail.push({ provider: entry.providerId, model, result: 'skipped', skipped: 'Cooldown (recent error)' });
           continue;
@@ -342,6 +390,13 @@ export class Router {
               providerRequest,
               keyRecord.customBaseUrl,
             );
+            
+            // Run Output Guards
+            for (const guard of this.guards) {
+              if (guard.validateOutput) {
+                await guard.validateOutput(response, guardCtx);
+              }
+            }
 
             this.stickySessions.set(ctx.userId, {
               providerId: entry.providerId,
@@ -369,6 +424,11 @@ export class Router {
               trail,
             };
           } catch (err) {
+            // If it's a Guardrail error, bubble it up immediately, don't failover
+            if (err instanceof RouterError && err.retryable === false && err.message.includes('Guardrail')) {
+              throw err;
+            }
+
             const msg = err instanceof Error ? err.message : String(err);
             errors.push(`${entry.providerId}/${model}: ${msg}`);
             trail.push({ provider: entry.providerId, model, result: 'error', error: msg.slice(0, 120) });
@@ -386,8 +446,83 @@ export class Router {
       }
     }
 
+    if (attempts === 0 && errors.length > 0 && errors.every((e) => e.includes('cooling down'))) {
+      const best = this.findLeastCooldownedEntry(chainToTry, ctx, now);
+      if (best) {
+        const adapter = this.adapters.get(best.providerId)!;
+        const keyRecord = ctx.providerKeys.find((k) => k.id === best.keyId)!;
+        this.cooldowns.delete(best.cdKey);
+        try {
+          const apiKey = ctx.decryptKey(keyRecord.encryptedKey);
+          const providerRequest: ChatCompletionRequest = {
+            ...fullRequest,
+            model: best.model,
+            stream,
+          };
+
+          if (stream) {
+            const gen = adapter.streamChatCompletion(apiKey, best.model, providerRequest, keyRecord.customBaseUrl);
+            this.stickySessions.set(ctx.userId, {
+              providerId: best.providerId,
+              model: best.model,
+              keyId: best.keyId,
+              pinnedUntil: Date.now() + STICKY_DURATION_MS,
+            });
+            trail.push({ provider: best.providerId, model: best.model, result: 'success' });
+            return {
+              stream: gen,
+              provider: best.providerId,
+              model: best.model,
+              attempts: 1,
+              trail,
+            };
+          }
+
+          const response = await adapter.chatCompletion(apiKey, best.model, providerRequest, keyRecord.customBaseUrl);
+
+          for (const guard of this.guards) {
+            if (guard.validateOutput) {
+              await guard.validateOutput(response, guardCtx);
+            }
+          }
+
+          this.stickySessions.set(ctx.userId, {
+            providerId: best.providerId,
+            model: best.model,
+            keyId: best.keyId,
+            pinnedUntil: Date.now() + STICKY_DURATION_MS,
+          });
+          trail.push({ provider: best.providerId, model: best.model, result: 'success' });
+          return {
+            response: {
+              ...response,
+              precious: {
+                provider: best.providerId,
+                model: best.model,
+                attempts: 1,
+                routeTrail: trail,
+              },
+            },
+            provider: best.providerId,
+            model: best.model,
+            attempts: 1,
+            trail,
+          };
+        } catch (err) {
+          if (err instanceof RouterError && err.retryable === false && err.message.includes('Guardrail')) {
+            throw err;
+          }
+          this.setCooldown(best.cdKey, Date.now());
+          errors.push(`${best.providerId}/${best.model}: final cooldown-bypass attempt also failed`);
+        }
+      }
+    }
+
+    const allCooldown = errors.every((e) => e.includes('cooling down') || e.includes('cooldown-bypass'));
     throw new RouterError(
-      `All providers exhausted after ${attempts} attempts. ${errors.join('; ')}`,
+      allCooldown
+        ? `All providers temporarily unavailable (cooling down from recent errors). ${errors.join('; ')}`
+        : `All providers exhausted after ${attempts} attempts. ${errors.join('; ')}`,
       false,
     );
   }

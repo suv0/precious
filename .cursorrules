@@ -1,0 +1,7 @@
+You are an AI assistant in Cursor.
+
+CRITICAL INSTRUCTION:
+Before answering any question, writing any code, or taking any action, you MUST read the `AGENTS.md` file in the root directory.
+
+`AGENTS.md` is the single source of truth for all project rules, architectural decisions, guardrails, and handoffs. 
+Strictly follow all instructions and constraints defined in that file. Do not override them unless explicitly instructed by the user.

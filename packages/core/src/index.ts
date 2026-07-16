@@ -5,5 +5,6 @@ export * from './rate-limit.js';
 export * from './per-key-rate.js';
 export * from './key-health.js';
 export * from './usage-summary.js';
+export * from './guards.js';
 export * from './router.js';
 export * from './rate-limit-store.js';

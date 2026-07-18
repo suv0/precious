@@ -9,6 +9,21 @@
 
 ## Quick start
 
+### Docker (one command — no Node.js required)
+
+```bash
+git clone https://github.com/suv0/precious.git
+cd precious
+docker compose up -d
+# Open http://localhost:3001
+```
+
+Multi-stage build compiles everything. ENCRYPTION_KEY auto-generated on first run, persisted in a Docker volume. Single port 3001 serves API + panel. Data survives `docker compose down` / `up` cycles.
+
+To wipe all data: `docker compose down -v`
+
+### Local dev (requires Node.js 20+)
+
 ```bash
 git clone https://github.com/suv0/precious.git
 cd precious
@@ -18,20 +33,13 @@ npm run build:core && npm run build:db && npm run build:providers
 # Terminal 1 — API (port 3001)
 npm run dev:server
 
-# Terminal 2 — Panel UI (port 3000) — optional; Docker serves both on :3001
+# Terminal 2 — Panel UI (port 3000)
 npm run dev:web
 ```
 
 Open **http://localhost:3000/settings/keys** (or **http://localhost:3001** with Docker).
 
 No login required — straight to the panel.
-
-### Docker (API + panel on one port)
-
-```bash
-docker compose up --build
-# http://localhost:3001/settings/keys
-```
 
 ### Unified API key
 

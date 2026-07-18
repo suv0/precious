@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { PanelProvider, type PanelConfig } from '@precious/panel';
 import { ShellLayout } from './ShellLayout';
@@ -10,6 +11,14 @@ const localPanelConfig: PanelConfig = {
   legalLinks: undefined,
 };
 
+function SuspendedShell({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <ShellLayout>{children}</ShellLayout>
+    </Suspense>
+  );
+}
+
 export function LocalPanelProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
@@ -18,7 +27,7 @@ export function LocalPanelProvider({ children }: { children: React.ReactNode }) 
       {pathname === '/' ? (
         <>{children}</>
       ) : (
-        <ShellLayout>{children}</ShellLayout>
+        <SuspendedShell>{children}</SuspendedShell>
       )}
     </PanelProvider>
   );

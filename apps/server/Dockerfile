@@ -9,7 +9,6 @@ RUN npm install --workspace=@precious/panel --workspace=@precious/web
 
 COPY packages/panel ./packages/panel
 COPY apps/web ./apps/web
-COPY tsconfig.json* ./
 
 ENV PRECIOUS_STATIC_EXPORT=1
 ENV NEXT_PUBLIC_PRECIOUS_MODE=local

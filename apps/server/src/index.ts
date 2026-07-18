@@ -82,6 +82,24 @@ async function main() {
   });
 
   if (existsSync(WEB_DIST)) {
+    // Map clean URLs to .html files (Next.js static export convention)
+    // e.g. /chat → chat.html, /settings/keys → settings/keys.html
+    app.use('*', async (c, next) => {
+      const url = new URL(c.req.url);
+      const pathname = url.pathname;
+      if (pathname.startsWith('/api/') || pathname.startsWith('/v1/') || pathname === '/health') {
+        return next();
+      }
+      if (pathname.includes('.')) return next();
+
+      const resolved = pathname.replace(/\/$/, '') || '/';
+      const htmlFile = resolved === '/' ? 'index.html' : resolved.slice(1) + '.html';
+      const fullPath = join(WEB_DIST, htmlFile);
+      if (existsSync(fullPath)) {
+        return c.html(readFileSync(fullPath, 'utf8'));
+      }
+      return next();
+    });
     app.use('/*', serveStatic({ root: WEB_DIST }));
     app.get('*', serveStatic({ path: join(WEB_DIST, 'index.html') }));
   } else if (process.env.NODE_ENV !== 'production') {

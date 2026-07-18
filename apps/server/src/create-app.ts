@@ -57,8 +57,7 @@ export function createPreciousApp(options: {
 
   const webDist = options.webDist;
   if (webDist) {
-    // Static UI served by Node server in local/docker all-in-one mode
-    app.get('/', (c) => c.redirect('/chat'));
+    // "/" is handled in index.ts via the extensionless .html mapper
   }
 
   return app;

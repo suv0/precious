@@ -378,453 +378,619 @@ export function KeysPage() {
         : newKey.providerId;
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
-        <div>
-          <h1 className="font-display text-3xl text-precious-gold">Keys & routing</h1>
-          {legalLinks && (
-            <p className="text-precious-muted text-sm mt-1">
-              Read{' '}
-              <Link href={legalLinks.legal} className="text-precious-gold hover:underline">
-                Legal / ToS
-              </Link>{' '}
-              before adding keys.
-            </p>
-          )}
-        </div>
-
-        {banner && <QuestBanner variant={banner.variant}>{banner.text}</QuestBanner>}
-
-        {hasProviderKeys && (
-          <section className="precious-card p-5">
-            <QuotaCapacityBar summary={quotaSummary} />
-            <p className="text-[11px] text-precious-muted/80 mt-3 leading-relaxed">
-              Bar width = each provider&apos;s share of your combined daily budget. Color drains as
-              Precious routes requests through that key. Google/Groq may enforce their own limits
-              separately — this is your local routing meter.
-            </p>
-          </section>
-        )}
-
-        <section className="precious-card p-6">
-          <h2 className="font-display text-lg text-precious-text mb-4">Unified API key</h2>
-          <p className="text-sm text-precious-muted mb-4">
-            Prefix <code className="text-precious-gold">prec_</code> — use in Cursor, Python, LangChain.
-            Routes through your provider keys below; useless without them.
+    <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 space-y-8">
+      <div>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-precious-gold/70 mb-1">
+          Hall of Keys
+        </p>
+        <h1 className="font-display text-3xl md:text-4xl text-precious-gold-bright gold-glow tracking-wide">
+          THE VAULT
+        </h1>
+        {legalLinks ? (
+          <p className="text-precious-muted text-sm mt-2">
+            Read{' '}
+            <Link href={legalLinks.legal} className="text-precious-gold hover:underline">
+              Legal / ToS
+            </Link>{' '}
+            before sealing secrets.
           </p>
-          {!hasProviderKeys && !unifiedKey && (
-            <QuestBanner variant="warn">{copy.warn.unifiedNeedsKeys}</QuestBanner>
-          )}
-          {unifiedKey ? (
-            <div className="mt-4 bg-precious-bg rounded-lg p-4 font-mono text-sm text-precious-gold break-all">
-              {unifiedKey}
-              <p className="text-red-300 text-xs mt-2 font-display">
-                Copy now — shown once only. Lose it and you must forge anew.
+        ) : (
+          <p className="text-precious-muted text-sm mt-2">
+            Encrypt provider keys and set the fallback chain that powers Sanctum.
+          </p>
+        )}
+      </div>
+
+      {banner && <QuestBanner variant={banner.variant}>{banner.text}</QuestBanner>}
+
+      <section className="vault-card p-6 md:p-10">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="space-y-3 min-w-0 flex-1 max-w-xl">
+            <h2 className="font-display text-2xl md:text-3xl text-precious-gold-bright gold-glow tracking-wide">
+              {copy.keys.oneKeyTitle}
+            </h2>
+            <p className="text-sm md:text-base text-precious-muted leading-relaxed">
+              A single <code className="text-precious-gold">prec_</code> token to rule your
+              inference. Routes across your fallback chain with full conversation context on
+              failover.
+            </p>
+            {!hasProviderKeys && !unifiedKey && (
+              <QuestBanner variant="warn">{copy.warn.unifiedNeedsKeys}</QuestBanner>
+            )}
+            {unifiedKey ? (
+              <div className="mt-1 p-4 bg-precious-bg/80 rounded-lg font-mono text-sm text-precious-gold break-all border border-precious-gold/20">
+                {unifiedKey}
+                <p className="text-red-300 text-xs mt-2 font-display">
+                  Copy now — shown once only. Lose it and you must forge anew.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={generateUnified}
+                className="precious-btn-gold mt-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={!hasProviderKeys}
+                title={!hasProviderKeys ? copy.warn.unifiedNeedsKeys : undefined}
+              >
+                Forge prec_ key
+              </button>
+            )}
+          </div>
+          <div
+            className={`shrink-0 self-center flex flex-col items-center justify-center w-36 h-36 md:w-44 md:h-44 rounded-full border-4 bg-precious-gold/5 shadow-[0_0_50px_rgba(242,195,107,0.1)] ${
+              hasProviderKeys ? 'border-precious-gold/20' : 'border-precious-emerald/30'
+            }`}
+          >
+            <svg
+              className={`w-10 h-10 md:w-12 md:h-12 ${hasProviderKeys ? 'text-precious-gold vault-pulse' : 'text-precious-muted/40'}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              viewBox="0 0 24 24"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z"
+              />
+            </svg>
+            <p
+              className={`text-[10px] uppercase tracking-widest mt-2 font-display ${
+                hasProviderKeys ? 'text-precious-gold' : 'text-precious-muted/50'
+              }`}
+            >
+              {hasProviderKeys ? 'Secured' : 'Empty'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* LEFT: Fallback chain */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="font-display text-xl text-precious-text tracking-wide">
+              {copy.keys.fallbackTitle}
+            </h2>
+            {chain.length > 0 && (
+              <span className="text-[10px] uppercase tracking-[0.16em] text-precious-muted">
+                Priority flow
+              </span>
+            )}
+          </div>
+          {chain.length === 0 ? (
+            <div className="precious-card p-5">
+              <p className="text-sm text-precious-muted font-display italic">
+                Seal a provider key to forge the fallback chain.
               </p>
             </div>
           ) : (
-            <button
-              onClick={generateUnified}
-              className="precious-btn-gold mt-4 disabled:opacity-40 disabled:cursor-not-allowed"
-              disabled={!hasProviderKeys}
-              title={!hasProviderKeys ? copy.warn.unifiedNeedsKeys : undefined}
-            >
-              Generate prec_ key
-            </button>
-          )}
-        </section>
-
-        <section ref={addSectionRef} className="precious-card p-6">
-          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-            <h2 className="font-display text-lg text-precious-text">
-              {addMode === 'backup'
-                ? `${copy.keys.backupTitle} — ${backupProviderName}`
-                : 'Add provider key'}
-            </h2>
-            {addMode === 'backup' && (
-              <button
-                type="button"
-                onClick={resetAddForm}
-                className="text-xs text-precious-muted hover:text-precious-gold"
-              >
-                Cancel backup
-              </button>
-            )}
-          </div>
-
-          {addMode === 'backup' && (
-            <p className="text-xs text-precious-muted mb-4 leading-relaxed">
-              {copy.keys.backupHint}
-            </p>
-          )}
-
-          {!showAddForm && hasProviderKeys && (
-            <p className="text-sm text-precious-muted leading-relaxed">
-              {copy.keys.allProvidersConfigured}
-            </p>
-          )}
-
-          {showAddForm && (
             <>
-              {needsCloudTrust && legalLinks && (
-                <div className="mb-4 p-4 rounded-lg border border-amber-800/50 bg-amber-950/30 text-sm text-precious-muted space-y-3">
-                  <p>
-                    <strong className="text-precious-text">You are trusting us with secrets.</strong>{' '}
-                    Provider keys are encrypted at rest, but you are storing them on our servers.
-                  </p>
-                  <label className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={cloudTrust}
-                      onChange={(e) => setCloudTrust(e.target.checked)}
-                      className="mt-1"
-                    />
-                    <span>
-                      I understand the tradeoffs and have read{' '}
-                      <Link href={legalLinks.security} className="text-precious-gold">Security</Link>,{' '}
-                      <Link href={legalLinks.privacy} className="text-precious-gold">Privacy</Link>, and{' '}
-                      <Link href={legalLinks.legal} className="text-precious-gold">Legal</Link>.
-                    </span>
-                  </label>
-                </div>
-              )}
-              {needsTos && legalLinks && (
-                <label className="flex items-start gap-3 mb-4 text-sm text-precious-muted">
-                  <input type="checkbox" checked={tosAck} onChange={(e) => setTosAck(e.target.checked)} className="mt-1" />
-                  <span>
-                    I own these API keys and accept each provider&apos;s Terms of Service. I have read{' '}
-                    <Link href={legalLinks.security} className="text-precious-gold">Security</Link>,{' '}
-                    <Link href={legalLinks.privacy} className="text-precious-gold">Privacy</Link>, and{' '}
-                    <Link href={legalLinks.legal} className="text-precious-gold">Legal</Link>.
-                  </span>
-                </label>
-              )}
-              {needsTos && !legalLinks && (
-                <label className="flex items-start gap-3 mb-4 text-sm text-precious-muted">
-                  <input type="checkbox" checked={tosAck} onChange={(e) => setTosAck(e.target.checked)} className="mt-1" />
-                  <span>I own these API keys and accept each provider&apos;s Terms of Service.</span>
-                </label>
-              )}
-              <form onSubmit={addKey} className="space-y-3">
-                <select
-                  className="precious-input"
-                  value={newKey.providerId}
-                  disabled={addMode === 'backup'}
-                  onChange={(e) => setNewKey({ ...newKey, providerId: e.target.value })}
-                  style={{ color: '#e8f0ec' }}
-                >
-                  {addProviderList.map((p) => (
-                    <option key={p.id} value={p.id} style={{ background: '#0a1612', color: '#e8f0ec' }}>
-                      {p.name} ({p.riskLevel} risk){p.freeTier === false ? ' 💳' : ''}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedProvider?.keySetupUrl && (
-                  <div className="rounded-lg border border-emerald-900/50 bg-precious-bg/60 px-4 py-3 text-sm space-y-2">
-                    <p className="text-precious-muted">
-                      {selectedProvider.keySetupHint ?? 'Create an API key at the provider, then paste it below.'}
-                    </p>
-                    {newKey.providerId === 'openai-compat' && (
-                      <ol className="list-decimal pl-5 space-y-1.5 text-precious-muted text-xs leading-relaxed">
-                        {copy.keys.ollamaSteps.map((step) => (
-                          <li key={step}>{step}</li>
-                        ))}
-                      </ol>
-                    )}
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <a
-                        href={selectedProvider.keySetupUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-precious-gold hover:underline font-display"
-                      >
-                        {selectedProvider.keySetupLinkLabel ??
-                          `Get ${selectedProvider.name} API key →`}
-                      </a>
-                      <Link
-                        href={`/docs#${docsAnchor}`}
-                        className="text-precious-muted hover:text-precious-gold hover:underline"
-                      >
-                        Full setup guide
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                <input
-                  className="precious-input"
-                  placeholder={
-                    addMode === 'backup'
-                      ? 'Label (e.g. Groq backup)'
-                      : 'Label (e.g. My Groq key)'
-                  }
-                  value={newKey.label}
-                  onChange={(e) => setNewKey({ ...newKey, label: e.target.value })}
-                  required
-                />
-                {newKey.providerId === 'cloudflare' && (
-                  <>
-                    <input
-                      className="precious-input"
-                      placeholder="Account ID (from dashboard URL or Workers AI page)"
-                      value={newKey.cloudflareAccountId}
-                      onChange={(e) => setNewKey({ ...newKey, cloudflareAccountId: e.target.value })}
-                      required
-                    />
-                    <input
-                      className="precious-input font-mono"
-                      placeholder="API Token (with Workers AI Read permission)"
-                      type="password"
-                      value={newKey.apiKey}
-                      onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
-                      required
-                    />
-                  </>
-                )}
-                {newKey.providerId !== 'cloudflare' && (
-                <input
-                  className="precious-input font-mono"
-                  placeholder={
-                    selectedProvider?.keyless
-                      ? 'API key (optional — anonymous tier)'
-                      : newKey.providerId === 'openai-compat'
-                        ? 'API key (use ollama for local Ollama)'
-                        : 'API key'
-                  }
-                  type="password"
-                  value={newKey.apiKey}
-                  onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
-                  required={!selectedProvider?.keyless}
-                />
-                )}
-                {newKey.providerId === 'openai-compat' && (
-                  <>
-                    <p className="text-[11px] text-precious-muted -mt-1">{copy.keys.ollamaApiKeyHint}</p>
-                    <input
-                      className="precious-input font-mono"
-                      placeholder="Base URL — http://localhost:11434/v1"
-                      value={newKey.customBaseUrl}
-                      onChange={(e) => setNewKey({ ...newKey, customBaseUrl: e.target.value })}
-                    />
-                    <p className="text-[11px] text-precious-muted -mt-1">{copy.keys.ollamaBaseUrlHint}</p>
-                  </>
-                )}
-                <button type="submit" className="precious-btn-primary">
-                  {addMode === 'backup' ? 'Add backup key' : 'Add key'}
-                </button>
-                {!canSubmitKey && (
-                  <p className="text-xs text-amber-200/90 font-display">
-                    Check the Terms box above to unlock the vault.
-                  </p>
-                )}
-              </form>
-            </>
-          )}
-        </section>
-
-        <section ref={keysSectionRef} className="precious-card p-6 scroll-mt-4">
-          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-            <h2 className="font-display text-lg text-precious-text">Your keys</h2>
-            {keys.length > 0 && (
-              <button
-                type="button"
-                onClick={runHealthCheck}
-                disabled={probing}
-                className="text-sm text-precious-gold hover:underline disabled:opacity-50"
-              >
-                {probing ? 'Testing all keys…' : 'Run health check'}
-              </button>
-            )}
-          </div>
-          {probing && (
-            <p className="text-xs text-precious-gold/90 mb-3 animate-pulse" role="status">
-              Sending a tiny test request to each provider — this can take a few seconds…
-            </p>
-          )}
-          {healthSummary && !probing && (
-            <p
-              className="text-xs text-precious-muted mb-3 leading-relaxed border border-emerald-900/40 rounded-lg px-3 py-2 bg-precious-bg/40"
-              role="status"
-            >
-              {healthSummary}
-            </p>
-          )}
-          {keys.length > 0 && (
-            <p className="text-xs text-precious-muted mb-4 leading-relaxed">
-              {copy.keys.backupHint} Use the{' '}
-              <span className="text-precious-gold/80" title="Test key with a small request">
-                ✓
-              </span>{' '}
-              icon to test one key.
-            </p>
-          )}
-          {keys.length === 0 ? (
-            <p className="text-precious-muted text-sm font-display italic">
-              No keys yet. The vault is empty — add one above.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {keys.map((k) => (
-                <li key={k.id} className="border-b border-emerald-900/30 pb-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <HealthDot status={k.healthStatus} />
-                      <div className="min-w-0">
-                        <span className="text-precious-text">{k.label}</span>
-                        <span className="text-precious-muted text-sm ml-2">{k.providerId}</span>
-                        {k.meta && <RiskBadge level={k.meta.riskLevel} />}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 text-sm">
-                      <button
-                        type="button"
-                        onClick={() => testKey(k)}
-                        disabled={testingKeyId === k.id || probing}
-                        className="inline-flex items-center gap-1 text-precious-muted hover:text-precious-gold disabled:opacity-50 p-0.5 rounded"
-                        title="Test key with a small request"
-                        aria-label={`Test ${k.label}`}
-                      >
-                        {testingKeyId === k.id ? (
-                          <svg
-                            className="w-4 h-4 animate-spin"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            aria-hidden
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="3"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden
-                          >
-                            <path d="M9 12l2 2 4-4" />
-                            <circle cx="12" cy="12" r="10" />
-                          </svg>
-                        )}
-                        {testingKeyId === k.id && (
-                          <span className="text-[10px] text-precious-gold/80">Testing…</span>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startReplace(k)}
-                        className="text-precious-gold hover:underline"
-                      >
-                        Replace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startBackup(k.providerId)}
-                        className="text-precious-muted hover:text-precious-gold hover:underline"
-                      >
-                        Add backup
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteKey(k.id)}
-                        className="text-red-400 hover:underline"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                  {keyFeedback[k.id] && (
-                    <p
-                      className={`text-xs mt-2 pl-5 leading-relaxed ${feedbackTextClass(keyFeedback[k.id].variant)}`}
-                      role="status"
+              <ul className="space-y-3">
+                {chain.map((e, i) => {
+                  const providerName =
+                    providers.find((p) => p.id === e.providerId)?.name ?? e.providerId;
+                  const health = keys.find((k) => k.providerId === e.providerId)?.healthStatus;
+                  return (
+                    <li
+                      key={`${e.providerId}-${e.model}`}
+                      className="precious-card p-4 flex items-center gap-3 hover:border-precious-gold/30 transition-colors"
                     >
-                      {keyFeedback[k.id].text}
-                    </p>
-                  )}
-                  {replacingKeyId === k.id && (
-                    <form onSubmit={replaceKey} className="mt-3 space-y-2 pl-6 border-l border-emerald-900/40">
-                      <input
-                        className="precious-input"
-                        placeholder="Label"
-                        value={replaceForm.label}
-                        onChange={(e) =>
-                          setReplaceForm({ ...replaceForm, label: e.target.value })
-                        }
-                      />
-                      <input
-                        className="precious-input font-mono"
-                        placeholder="New API key"
-                        type="password"
-                        value={replaceForm.apiKey}
-                        onChange={(e) =>
-                          setReplaceForm({ ...replaceForm, apiKey: e.target.value })
-                        }
-                        required
-                      />
-                      {k.providerId === 'openai-compat' && (
-                        <input
-                          className="precious-input"
-                          placeholder="Base URL"
-                          value={replaceForm.customBaseUrl}
-                          onChange={(e) =>
-                            setReplaceForm({ ...replaceForm, customBaseUrl: e.target.value })
-                          }
-                        />
-                      )}
-                      <div className="flex gap-2">
-                        <button type="submit" className="precious-btn-primary text-sm py-1.5 px-3">
-                          Save new key
+                      <span className="text-precious-muted/60 font-mono text-xs w-5 shrink-0">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display text-sm text-precious-gold uppercase tracking-wider truncate">
+                          {providerName}
+                        </p>
+                        <p className="text-xs text-precious-muted truncate">{e.model}</p>
+                      </div>
+                      <HealthDot status={health} />
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => moveChain(i, -1)}
+                          className="text-precious-gold hover:text-precious-gold-bright px-1 disabled:opacity-30"
+                          disabled={i === 0}
+                          aria-label="Move up"
+                        >
+                          ↑
                         </button>
                         <button
                           type="button"
-                          onClick={cancelReplace}
-                          className="text-sm text-precious-muted hover:text-precious-text"
+                          onClick={() => moveChain(i, 1)}
+                          className="text-precious-gold hover:text-precious-gold-bright px-1 disabled:opacity-30"
+                          disabled={i === chain.length - 1}
+                          aria-label="Move down"
                         >
-                          Cancel
+                          ↓
                         </button>
                       </div>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button type="button" onClick={saveChain} className="precious-btn-gold w-full">
+                Save order
+              </button>
+            </>
           )}
-        </section>
+        </div>
 
-        {chain.length > 0 && (
-          <section className="precious-card p-6">
-            <h2 className="font-display text-lg text-precious-text mb-4">Fallback chain</h2>
-            <ul className="space-y-2">
-              {chain.map((e, i) => (
-                <li key={`${e.providerId}-${e.model}`} className="flex items-center gap-3 text-sm">
-                  <span className="text-precious-muted w-6">{i + 1}.</span>
-                  <span className="text-precious-text flex-1">
-                    {e.providerId} / {e.model}
-                  </span>
-                  <button type="button" onClick={() => moveChain(i, -1)} className="text-precious-gold">↑</button>
-                  <button type="button" onClick={() => moveChain(i, 1)} className="text-precious-gold">↓</button>
-                </li>
-              ))}
-            </ul>
-            <button type="button" onClick={saveChain} className="precious-btn-gold mt-4">
-              Save order
-            </button>
+        {/* RIGHT: Capacity + Seal form */}
+        <div className="lg:col-span-7 space-y-6">
+          {hasProviderKeys && (
+            <section className="precious-card p-6 space-y-4">
+              <h2 className="font-display text-xl text-precious-text tracking-wide">
+                {copy.keys.vaultCapacity}
+              </h2>
+              <QuotaCapacityBar summary={quotaSummary} />
+              <p className="text-[11px] text-precious-muted/80 leading-relaxed">
+                Bar width = each provider&apos;s share of your combined daily budget. Color drains as
+                Precious routes requests through that key. Google/Groq may enforce their own limits
+                separately — this is your local routing meter.
+              </p>
+            </section>
+          )}
+
+          <section ref={addSectionRef} className="precious-card p-6 md:p-8 scroll-mt-4">
+            <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+              <h2 className="font-display text-xl text-precious-gold tracking-wide">
+                {addMode === 'backup'
+                  ? `${copy.keys.backupTitle} — ${backupProviderName}`
+                  : copy.keys.sealTitle}
+              </h2>
+              {addMode === 'backup' && (
+                <button
+                  type="button"
+                  onClick={resetAddForm}
+                  className="text-xs text-precious-muted hover:text-precious-gold"
+                >
+                  Cancel backup
+                </button>
+              )}
+            </div>
+            {addMode !== 'backup' && (
+              <p className="text-sm text-precious-muted mb-5">
+                Encrypt and store a new API key in the vault.
+              </p>
+            )}
+
+            {addMode === 'backup' && (
+              <p className="text-xs text-precious-muted mb-4 leading-relaxed">
+                {copy.keys.backupHint}
+              </p>
+            )}
+
+            {!showAddForm && hasProviderKeys && (
+              <p className="text-sm text-precious-muted leading-relaxed">
+                {copy.keys.allProvidersConfigured}
+              </p>
+            )}
+
+            {showAddForm && (
+              <>
+                {needsCloudTrust && legalLinks && (
+                  <div className="mb-4 p-4 rounded-lg border border-precious-gold/30 bg-precious-gold/5 text-sm text-precious-muted space-y-3">
+                    <p>
+                      <strong className="text-precious-text">You are trusting us with secrets.</strong>{' '}
+                      Provider keys are encrypted at rest, but you are storing them on our servers.
+                    </p>
+                    <label className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={cloudTrust}
+                        onChange={(e) => setCloudTrust(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span>
+                        I understand the tradeoffs and have read{' '}
+                        <Link href={legalLinks.security} className="text-precious-gold">
+                          Security
+                        </Link>
+                        ,{' '}
+                        <Link href={legalLinks.privacy} className="text-precious-gold">
+                          Privacy
+                        </Link>
+                        , and{' '}
+                        <Link href={legalLinks.legal} className="text-precious-gold">
+                          Legal
+                        </Link>
+                        .
+                      </span>
+                    </label>
+                  </div>
+                )}
+                {needsTos && legalLinks && (
+                  <label className="flex items-start gap-3 mb-4 text-sm text-precious-muted">
+                    <input
+                      type="checkbox"
+                      checked={tosAck}
+                      onChange={(e) => setTosAck(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      I own these API keys and accept each provider&apos;s Terms of Service. I have
+                      read{' '}
+                      <Link href={legalLinks.security} className="text-precious-gold">
+                        Security
+                      </Link>
+                      ,{' '}
+                      <Link href={legalLinks.privacy} className="text-precious-gold">
+                        Privacy
+                      </Link>
+                      , and{' '}
+                      <Link href={legalLinks.legal} className="text-precious-gold">
+                        Legal
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                )}
+                {needsTos && !legalLinks && (
+                  <label className="flex items-start gap-3 mb-4 text-sm text-precious-muted">
+                    <input
+                      type="checkbox"
+                      checked={tosAck}
+                      onChange={(e) => setTosAck(e.target.checked)}
+                      className="mt-1"
+                    />
+                    <span>
+                      I own these API keys and accept each provider&apos;s Terms of Service.
+                    </span>
+                  </label>
+                )}
+                <form onSubmit={addKey} className="space-y-3">
+                  <label className="block text-[10px] uppercase tracking-[0.16em] text-precious-muted">
+                    Select provider
+                  </label>
+                  <select
+                    className="precious-input"
+                    value={newKey.providerId}
+                    disabled={addMode === 'backup'}
+                    onChange={(e) => setNewKey({ ...newKey, providerId: e.target.value })}
+                    style={{ color: '#dce4e0' }}
+                  >
+                    {addProviderList.map((p) => (
+                      <option
+                        key={p.id}
+                        value={p.id}
+                        style={{ background: '#0d1513', color: '#dce4e0' }}
+                      >
+                        {p.name} ({p.riskLevel} risk)
+                        {p.freeTier === false ? ' · paid' : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedProvider?.keySetupUrl && (
+                    <div className="rounded-lg border border-precious-emerald/40 bg-precious-bg/60 px-4 py-3 text-sm space-y-2">
+                      <p className="text-precious-muted">
+                        {selectedProvider.keySetupHint ??
+                          'Create an API key at the provider, then paste it below.'}
+                      </p>
+                      {newKey.providerId === 'openai-compat' && (
+                        <ol className="list-decimal pl-5 space-y-1.5 text-precious-muted text-xs leading-relaxed">
+                          {copy.keys.ollamaSteps.map((step) => (
+                            <li key={step}>{step}</li>
+                          ))}
+                        </ol>
+                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        <a
+                          href={selectedProvider.keySetupUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-precious-gold hover:underline font-display"
+                        >
+                          {selectedProvider.keySetupLinkLabel ??
+                            `Get ${selectedProvider.name} API key →`}
+                        </a>
+                        <Link
+                          href={`/docs#${docsAnchor}`}
+                          className="text-precious-muted hover:text-precious-gold hover:underline"
+                        >
+                          Full setup guide
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  <input
+                    className="precious-input"
+                    placeholder={
+                      addMode === 'backup'
+                        ? 'Label (e.g. Groq backup)'
+                        : 'Label (e.g. My Groq key)'
+                    }
+                    value={newKey.label}
+                    onChange={(e) => setNewKey({ ...newKey, label: e.target.value })}
+                    required
+                  />
+                  {newKey.providerId === 'cloudflare' && (
+                    <>
+                      <input
+                        className="precious-input"
+                        placeholder="Account ID (from dashboard URL or Workers AI page)"
+                        value={newKey.cloudflareAccountId}
+                        onChange={(e) =>
+                          setNewKey({ ...newKey, cloudflareAccountId: e.target.value })
+                        }
+                        required
+                      />
+                      <input
+                        className="precious-input font-mono"
+                        placeholder="API Token (with Workers AI Read permission)"
+                        type="password"
+                        value={newKey.apiKey}
+                        onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
+                        required
+                      />
+                    </>
+                  )}
+                  {newKey.providerId !== 'cloudflare' && (
+                    <input
+                      className="precious-input font-mono"
+                      placeholder={
+                        selectedProvider?.keyless
+                          ? 'API key (optional — anonymous tier)'
+                          : newKey.providerId === 'openai-compat'
+                            ? 'API key (use ollama for local Ollama)'
+                            : 'API key'
+                      }
+                      type="password"
+                      value={newKey.apiKey}
+                      onChange={(e) => setNewKey({ ...newKey, apiKey: e.target.value })}
+                      required={!selectedProvider?.keyless}
+                    />
+                  )}
+                  {newKey.providerId === 'openai-compat' && (
+                    <>
+                      <p className="text-[11px] text-precious-muted -mt-1">
+                        {copy.keys.ollamaApiKeyHint}
+                      </p>
+                      <input
+                        className="precious-input font-mono"
+                        placeholder="Base URL — http://localhost:11434/v1"
+                        value={newKey.customBaseUrl}
+                        onChange={(e) =>
+                          setNewKey({ ...newKey, customBaseUrl: e.target.value })
+                        }
+                      />
+                      <p className="text-[11px] text-precious-muted -mt-1">
+                        {copy.keys.ollamaBaseUrlHint}
+                      </p>
+                    </>
+                  )}
+                  <button type="submit" className="precious-btn-primary w-full">
+                    {addMode === 'backup' ? 'Add backup key' : copy.keys.sealCta}
+                  </button>
+                  {!canSubmitKey && (
+                    <p className="text-xs text-precious-gold-bright/90 font-display">
+                      Check the Terms box above to unlock the vault.
+                    </p>
+                  )}
+                </form>
+              </>
+            )}
           </section>
-        )}
+        </div>
       </div>
+
+      {/* Your keys — below the grid */}
+      <section ref={keysSectionRef} className="precious-card p-6 scroll-mt-4">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <h2 className="font-display text-xl text-precious-text tracking-wide">Your keys</h2>
+          {keys.length > 0 && (
+            <button
+              type="button"
+              onClick={runHealthCheck}
+              disabled={probing}
+              className="text-sm text-precious-gold hover:underline disabled:opacity-50"
+            >
+              {probing ? 'Testing all keys…' : 'Run health check'}
+            </button>
+          )}
+        </div>
+        {probing && (
+          <p className="text-xs text-precious-gold/90 mb-3 animate-pulse" role="status">
+            Sending a tiny test request to each provider — this can take a few seconds…
+          </p>
+        )}
+        {healthSummary && !probing && (
+          <p
+            className="text-xs text-precious-muted mb-3 leading-relaxed border border-precious-emerald/40 rounded-lg px-3 py-2 bg-precious-bg/40"
+            role="status"
+          >
+            {healthSummary}
+          </p>
+        )}
+        {keys.length > 0 && (
+          <p className="text-xs text-precious-muted mb-4 leading-relaxed">
+            {copy.keys.backupHint} Use the{' '}
+            <span className="text-precious-gold/80" title="Test key with a small request">
+              ✓
+            </span>{' '}
+            icon to test one key.
+          </p>
+        )}
+        {keys.length === 0 ? (
+          <p className="text-precious-muted text-sm font-display italic">
+            No keys yet. The vault is empty — seal one above.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {keys.map((k) => (
+              <li
+                key={k.id}
+                className="precious-card p-4 border border-precious-emerald/30 hover:border-precious-gold/25 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <HealthDot status={k.healthStatus} />
+                    <div className="min-w-0">
+                      <span className="text-precious-text">{k.label}</span>
+                      <span className="text-precious-muted text-sm ml-2">{k.providerId}</span>
+                      {k.meta && <RiskBadge level={k.meta.riskLevel} />}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 text-sm">
+                    <button
+                      type="button"
+                      onClick={() => testKey(k)}
+                      disabled={testingKeyId === k.id || probing}
+                      className="inline-flex items-center gap-1 text-precious-muted hover:text-precious-gold disabled:opacity-50 p-0.5 rounded"
+                      title="Test key with a small request"
+                      aria-label={`Test ${k.label}`}
+                    >
+                      {testingKeyId === k.id ? (
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          aria-hidden
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-4 h-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M9 12l2 2 4-4" />
+                          <circle cx="12" cy="12" r="10" />
+                        </svg>
+                      )}
+                      {testingKeyId === k.id && (
+                        <span className="text-[10px] text-precious-gold/80">Testing…</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startReplace(k)}
+                      className="text-precious-gold hover:underline"
+                    >
+                      Replace
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startBackup(k.providerId)}
+                      className="text-precious-muted hover:text-precious-gold hover:underline"
+                    >
+                      Add backup
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteKey(k.id)}
+                      className="text-red-400 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                {keyFeedback[k.id] && (
+                  <p
+                    className={`text-xs mt-2 pl-5 leading-relaxed ${feedbackTextClass(keyFeedback[k.id].variant)}`}
+                    role="status"
+                  >
+                    {keyFeedback[k.id].text}
+                  </p>
+                )}
+                {replacingKeyId === k.id && (
+                  <form
+                    onSubmit={replaceKey}
+                    className="mt-3 space-y-2 pl-6 border-l border-precious-emerald/40"
+                  >
+                    <input
+                      className="precious-input"
+                      placeholder="Label"
+                      value={replaceForm.label}
+                      onChange={(e) =>
+                        setReplaceForm({ ...replaceForm, label: e.target.value })
+                      }
+                    />
+                    <input
+                      className="precious-input font-mono"
+                      placeholder="New API key"
+                      type="password"
+                      value={replaceForm.apiKey}
+                      onChange={(e) =>
+                        setReplaceForm({ ...replaceForm, apiKey: e.target.value })
+                      }
+                      required
+                    />
+                    {k.providerId === 'openai-compat' && (
+                      <input
+                        className="precious-input"
+                        placeholder="Base URL"
+                        value={replaceForm.customBaseUrl}
+                        onChange={(e) =>
+                          setReplaceForm({ ...replaceForm, customBaseUrl: e.target.value })
+                        }
+                      />
+                    )}
+                    <div className="flex gap-2">
+                      <button type="submit" className="precious-btn-primary text-sm py-1.5 px-3">
+                        Save new key
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelReplace}
+                        className="text-sm text-precious-muted hover:text-precious-text"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <p className="text-center font-display text-xs tracking-[0.25em] uppercase text-precious-gold/30 pt-2">
+        The Precious Vault
+      </p>
+    </div>
   );
 }

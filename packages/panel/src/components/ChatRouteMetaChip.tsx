@@ -6,7 +6,7 @@ export function ChatRouteMetaChip({ meta }: { meta: ChatResponseMeta | null }) {
 
   return (
     <span
-      className="text-xs text-precious-gold/90 border border-emerald-800/60 bg-emerald-950/40 rounded-full px-3 py-1 font-mono tracking-tight"
+      className="text-[10px] uppercase tracking-wider text-precious-gold/90 border border-precious-gold/30 bg-precious-gold/10 rounded-full px-2.5 py-0.5 font-semibold"
       title="Provider and model used for the latest reply"
     >
       {line}

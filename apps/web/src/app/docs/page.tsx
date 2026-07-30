@@ -11,7 +11,7 @@ const cloudGuides = [
       'Go to console.groq.com and create an account',
       'Navigate to API Keys → Create API Key',
       'Copy the key (starts with gsk_)',
-      'In Precious Settings → Keys, select Groq and paste',
+      'In The Vault, select Groq and paste',
     ],
     url: 'https://console.groq.com/keys',
   },
@@ -23,7 +23,7 @@ const cloudGuides = [
       'Sign in at platform.openai.com',
       'Go to API keys → Create new secret key',
       'Copy the key (starts with sk-)',
-      'In Precious Settings → Keys, select OpenAI and paste',
+      'In The Vault, select OpenAI and paste',
     ],
     url: 'https://platform.openai.com/api-keys',
   },
@@ -35,7 +35,7 @@ const cloudGuides = [
       'Go to aistudio.google.com/apikey',
       'Create API key in Google AI Studio',
       'Copy the key',
-      'In Precious, select Google Gemini and paste',
+      'In The Vault, select Google Gemini and paste',
     ],
     url: 'https://aistudio.google.com/apikey',
   },
@@ -47,7 +47,7 @@ const cloudGuides = [
       'Sign up at openrouter.ai',
       'Go to Keys → Create Key',
       'Copy the key (starts with sk-or-)',
-      'In Precious, select OpenRouter and paste',
+      'In The Vault, select OpenRouter and paste',
     ],
     url: 'https://openrouter.ai/keys',
   },
@@ -59,7 +59,7 @@ const cloudGuides = [
       'Sign up at console.mistral.ai',
       'Create an API key under API Keys',
       'Copy the key',
-      'In Precious, select Mistral and paste',
+      'In The Vault, select Mistral and paste',
     ],
     url: 'https://console.mistral.ai/api-keys',
   },
@@ -151,8 +151,8 @@ export default function DocsPage() {
 
             <h3 className="font-display text-precious-text mb-2">4. Add the key in Precious</h3>
             <p className="text-precious-muted mb-2">
-              Go to <Link href="/settings/keys" className="text-precious-gold hover:underline">Keys & routing</Link>{' '}
-              → Add provider key → <strong className="text-precious-text">Custom OpenAI-compatible</strong>.
+              Go to <Link href="/settings/keys" className="text-precious-gold hover:underline">The Vault</Link>{' '}
+              → Seal a new secret → <strong className="text-precious-text">Custom OpenAI-compatible</strong>.
               Fill in:
             </p>
             <div className="overflow-x-auto mb-4">

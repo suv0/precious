@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Logo } from './Logo';
+import { VaultWordmark } from './Logo';
 
 export interface ConversationItem {
   id: string;
@@ -23,6 +23,36 @@ function formatTime(date: Date | string): string {
   if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+const NAV = [
+  {
+    href: '/chat',
+    label: 'Sanctum',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h6v6H4V5zm10 0h6v6h-6V5zM4 13h6v6H4v-6zm10 0h6v6h-6v-6z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/settings/keys',
+    label: 'The Vault',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/settings/audit',
+    label: 'Chronicles',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 4h11a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V6a2 2 0 012-2z" />
+      </svg>
+    ),
+  },
+] as const;
 
 export function ChatSidebar({
   conversations,
@@ -45,38 +75,30 @@ export function ChatSidebar({
   const [renameValue, setRenameValue] = useState('');
 
   const filtered = search
-    ? conversations.filter((c) =>
-        c.title.toLowerCase().includes(search.toLowerCase()),
-      )
+    ? conversations.filter((c) => c.title.toLowerCase().includes(search.toLowerCase()))
     : conversations;
 
-  const navItems = [
-    { href: '/chat', label: 'Chat', icon: '💬' },
-    { href: '/settings/keys', label: 'Keys', icon: '🔑' },
-    { href: '/settings/audit', label: 'Audit', icon: '📋' },
-  ];
-
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 pt-4 pb-2">
-        <Logo />
+    <div className="flex flex-col h-full bg-precious-bg/80 border-r border-precious-emerald/30">
+      <div className="px-4 pt-5 pb-3">
+        <VaultWordmark />
       </div>
 
       <div className="px-3 pb-3">
         <button
           type="button"
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-emerald-800/60 hover:bg-emerald-700/60 text-emerald-100 border border-emerald-700/40 transition-colors"
+          className="precious-btn-primary w-full text-sm py-2.5"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          New Chat
+          New Whisper
         </button>
       </div>
 
       <nav className="px-2 pb-2 space-y-0.5">
-        {navItems.map((item) => {
+        {NAV.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
             <Link
@@ -84,23 +106,23 @@ export function ChatSidebar({
               href={item.href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors ${
                 active
-                  ? 'bg-emerald-900/40 text-precious-gold'
-                  : 'text-precious-muted hover:bg-emerald-950/30 hover:text-precious-text'
+                  ? 'bg-precious-emerald/40 text-precious-gold-bright border-l-2 border-precious-gold'
+                  : 'text-precious-muted hover:bg-precious-surface/50 hover:text-precious-text border-l-2 border-transparent'
               }`}
             >
-              <span className="w-5 text-center text-xs">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className={active ? 'text-precious-gold' : ''}>{item.icon}</span>
+              <span className="font-medium tracking-wide">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="mx-3 border-t border-emerald-900/40" />
+      <div className="mx-3 border-t border-precious-emerald/40" />
 
-      <div className="flex-1 flex flex-col min-h-0 pt-2">
+      <div className="flex-1 flex flex-col min-h-0 pt-3">
         <div className="px-3 pb-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-precious-muted/60">
-            Recents
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-precious-muted/70">
+            Temporal Logs
           </span>
         </div>
 
@@ -113,14 +135,18 @@ export function ChatSidebar({
               strokeWidth="2"
               viewBox="0 0 24 24"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+              />
             </svg>
             <input
               type="text"
-              placeholder="Search recents..."
+              placeholder="Scan recent secrets…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-md text-xs bg-emerald-950/50 border border-emerald-900/40 text-precious-text placeholder:text-precious-muted/40 focus:outline-none focus:border-emerald-700/60"
+              className="w-full pl-8 pr-3 py-1.5 rounded-md text-xs bg-precious-surface-low/80 border border-precious-emerald/40 text-precious-text placeholder:text-precious-muted/40 focus:outline-none focus:border-precious-gold/50"
             />
           </div>
         </div>
@@ -128,7 +154,7 @@ export function ChatSidebar({
         <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
           {filtered.length === 0 && (
             <p className="text-xs text-precious-muted/50 px-3 py-6 text-center">
-              {search ? 'No matching conversations' : 'No conversations yet'}
+              {search ? 'No matching whispers' : 'No temporal logs yet'}
             </p>
           )}
           {filtered.map((conv) => {
@@ -158,7 +184,7 @@ export function ChatSidebar({
                       if (e.key === 'Escape') setRenamingId(null);
                     }}
                     autoFocus
-                    className="w-full px-3 py-2 rounded-md text-xs bg-emerald-950/70 border border-emerald-700/50 text-precious-text outline-none"
+                    className="w-full px-3 py-2 rounded-md text-xs bg-precious-surface border border-precious-gold/40 text-precious-text outline-none"
                   />
                 </div>
               );
@@ -177,8 +203,8 @@ export function ChatSidebar({
                   }}
                   className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
                     isActive
-                      ? 'bg-emerald-900/50 text-precious-text'
-                      : 'text-precious-muted hover:bg-emerald-950/40 hover:text-precious-text/80'
+                      ? 'bg-precious-emerald/45 text-precious-text border border-precious-gold/35'
+                      : 'text-precious-muted hover:bg-precious-surface/60 hover:text-precious-text/90 border border-transparent'
                   }`}
                 >
                   <div className="text-xs font-medium truncate">{conv.title}</div>
@@ -197,12 +223,31 @@ export function ChatSidebar({
                     className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-[10px] text-red-400/60 hover:text-red-400 transition-opacity p-1"
                     title="Delete conversation"
                   >
-                    x
+                    ×
                   </button>
                 )}
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mt-auto border-t border-precious-emerald/40 px-4 py-3 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full border border-precious-gold/40 bg-precious-surface flex items-center justify-center text-precious-gold">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+            />
+          </svg>
+        </div>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-precious-text truncate">Local Warden</div>
+          <div className="flex items-center gap-1.5 text-[10px] text-precious-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 vault-pulse" />
+            Shield active
+          </div>
         </div>
       </div>
     </div>

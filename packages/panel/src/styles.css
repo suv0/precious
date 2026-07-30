@@ -1,60 +1,203 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --precious-emerald: #0d3b2e;
-  --precious-gold: #d4a853;
-  --precious-bg: #0a1612;
+  --precious-bg: #0d1513;
   --precious-surface: #112820;
-  --precious-text: #e8f0ec;
+  --precious-surface-low: #161d1b;
+  --precious-surface-high: #242c29;
+  --precious-emerald: #0d3b2e;
+  --precious-emerald-light: #1a5c45;
+  --precious-gold: #d4a853;
+  --precious-gold-bright: #f2c36b;
+  --precious-gold-dim: #a67c2e;
+  --precious-text: #dce4e0;
   --precious-muted: #8aab9a;
+  --precious-on-variant: #d2c5b2;
+  --precious-outline: #4e4637;
+  --emerald-glow: rgba(13, 59, 46, 0.6);
+  --gold-bloom: rgba(238, 192, 104, 0.4);
 }
 
 .font-display {
   font-family: 'Cinzel', serif;
 }
 
+.font-body {
+  font-family: 'Source Sans 3', sans-serif;
+}
+
 .gold-glow {
-  text-shadow: 0 0 20px rgba(212, 168, 83, 0.4);
+  text-shadow: 0 0 20px rgba(242, 195, 107, 0.35);
 }
 
 .precious-card {
   border-radius: 0.75rem;
-  border: 1px solid rgba(6, 78, 59, 0.6);
-  background: rgba(17, 40, 32, 0.8);
-  backdrop-filter: blur(4px);
+  border: 1px solid rgba(13, 59, 46, 0.5);
+  background: linear-gradient(135deg, rgba(17, 40, 32, 0.85) 0%, rgba(13, 21, 19, 0.92) 100%);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.vault-card {
+  position: relative;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(13, 59, 46, 0.5);
+  background: linear-gradient(135deg, rgba(17, 40, 32, 0.85) 0%, rgba(13, 21, 19, 0.92) 100%);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.vault-card::before,
+.vault-card::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: rgba(212, 168, 83, 0.55);
+  pointer-events: none;
+}
+
+.vault-card::before {
+  top: 10px;
+  left: 10px;
+  border-top: 1.5px solid;
+  border-left: 1.5px solid;
+}
+
+.vault-card::after {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 1.5px solid;
+  border-right: 1.5px solid;
 }
 
 .precious-btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   border-radius: 0.5rem;
   padding: 0.625rem 1.25rem;
-  font-weight: 500;
-  background: linear-gradient(to right, #047857, #059669);
-  color: white;
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 600;
+  background: linear-gradient(to bottom right, #0d3b2e, #112820);
+  color: var(--precious-gold-bright);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.precious-btn-primary:hover {
+  box-shadow: 0 0 20px var(--emerald-glow);
+  transform: translateY(-1px);
+}
+
+.precious-btn-primary:disabled {
+  opacity: 0.45;
+  transform: none;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .precious-btn-gold {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   border-radius: 0.5rem;
   padding: 0.625rem 1.25rem;
-  font-weight: 500;
-  border: 1px solid rgba(212, 168, 83, 0.5);
-  color: var(--precious-gold);
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 600;
+  border: 1px solid var(--precious-gold);
+  color: var(--precious-gold-bright);
+  background: transparent;
+  transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.precious-btn-gold:hover {
+  background: rgba(212, 168, 83, 0.1);
+  box-shadow: 0 0 15px var(--gold-bloom);
+  transform: translateY(-1px);
 }
 
 .precious-input {
   width: 100%;
   border-radius: 0.5rem;
-  border: 1px solid rgba(6, 78, 59, 0.6);
-  background: rgba(10, 22, 18, 0.8);
+  border: 1px solid rgba(13, 59, 46, 0.6);
+  background: rgba(8, 16, 14, 0.85);
   padding: 0.625rem 1rem;
   color: var(--precious-text);
+  font-family: 'Source Sans 3', sans-serif;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.risk-low { background: rgba(6, 78, 59, 0.5); color: #6ee7b7; border: 1px solid #047857; }
-.risk-medium { background: rgba(120, 53, 15, 0.4); color: #fcd34d; border: 1px solid #b45309; }
-.risk-high { background: rgba(127, 29, 29, 0.4); color: #fca5a5; border: 1px solid #b91c1c; }
+.precious-input::placeholder {
+  color: var(--precious-muted);
+}
+
+.precious-input:focus {
+  outline: none;
+  border-color: var(--precious-gold);
+  box-shadow: 0 0 0 1px rgba(212, 168, 83, 0.25), 0 0 12px rgba(238, 192, 104, 0.15);
+}
+
+.nav-active {
+  color: var(--precious-gold-bright);
+  position: relative;
+}
+
+.nav-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: var(--precious-gold);
+  border-radius: 1px;
+  box-shadow: 0 0 8px var(--gold-bloom);
+}
+
+.risk-low {
+  background: rgba(6, 78, 59, 0.5);
+  color: #6ee7b7;
+  border: 1px solid #047857;
+}
+
+.risk-medium {
+  background: rgba(120, 53, 15, 0.4);
+  color: #fcd34d;
+  border: 1px solid #b45309;
+}
+
+.risk-high {
+  background: rgba(127, 29, 29, 0.4);
+  color: #fca5a5;
+  border: 1px solid #b91c1c;
+}
+
+@keyframes vault-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.vault-float {
+  animation: vault-float 6s ease-in-out infinite;
+}
+
+@keyframes vault-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.vault-pulse {
+  animation: vault-pulse 2s ease-in-out infinite;
+}

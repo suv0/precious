@@ -8,6 +8,6 @@ export { PanelLayout } from './components/PanelLayout';
 export { PanelHeader } from './components/PanelHeader';
 export { ChatSidebar } from './components/ChatSidebar';
 export type { ConversationItem } from './components/ChatSidebar';
-export { Logo } from './components/Logo';
+export { Logo, VaultWordmark } from './components/Logo';
 export { RiskBadge, HealthDot } from './components/RiskBadge';
 export * from './lib/api';

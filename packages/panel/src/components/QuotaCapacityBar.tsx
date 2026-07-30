@@ -26,8 +26,9 @@ export function QuotaCapacityBar({
       title="Tokens consumed today across all connected providers vs your estimated token budget."
     >
       <div className="flex items-center justify-between gap-2 text-[11px] text-precious-muted">
-        <span className="font-display tracking-wide text-precious-muted/90">
-          Token budgets · {summary.totalTokensToday.toLocaleString()} / {summary.totalTokenBudget.toLocaleString()} today
+        <span className="font-display tracking-wide text-precious-gold/80 text-[11px] uppercase">
+          Vault capacity · {summary.totalTokensToday.toLocaleString()} /{' '}
+          {summary.totalTokenBudget.toLocaleString()} today
         </span>
         {!compact && summary.resetsDayAt && (
           <span>{formatReset(summary.resetsDayAt)}</span>

@@ -4,8 +4,8 @@ import '@precious/panel/styles.css';
 import { LocalPanelProvider } from '@/components/LocalPanelProvider';
 
 export const metadata: Metadata = {
-  title: 'Precious Local — Keys & Chat',
-  description: 'Self-hosted LLM router panel. Add keys, chat, unified prec_ API key.',
+  title: 'Precious Local — The Vault',
+  description: 'Self-hosted LLM router. Seal keys, whisper in Sanctum, forge a prec_ API key.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

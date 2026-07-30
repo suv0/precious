@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, type ProviderMeta } from '../lib/api';
 import { RiskBadge } from '../components/RiskBadge';
+import { Logo } from '../components/Logo';
 
 const PROVIDER_ORDER = [
   'groq',
@@ -37,8 +38,8 @@ export function WelcomePage() {
           return;
         }
         const sorted = [...providersRes.providers].sort((a, b) => {
-          const ai = PROVIDER_ORDER.indexOf(a.id as typeof PROVIDER_ORDER[number]);
-          const bi = PROVIDER_ORDER.indexOf(b.id as typeof PROVIDER_ORDER[number]);
+          const ai = PROVIDER_ORDER.indexOf(a.id as (typeof PROVIDER_ORDER)[number]);
+          const bi = PROVIDER_ORDER.indexOf(b.id as (typeof PROVIDER_ORDER)[number]);
           if (ai === -1 && bi === -1) return 0;
           if (ai === -1) return 1;
           if (bi === -1) return -1;
@@ -73,7 +74,7 @@ export function WelcomePage() {
       setTimeout(() => router.push('/chat'), 1200);
     } catch (err) {
       setStatus('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to add key');
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to seal key');
     }
   }, [selected, needsKey, apiKey, label, router]);
 
@@ -81,7 +82,7 @@ export function WelcomePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-precious-bg">
         <p className="text-precious-muted text-sm animate-pulse font-display">
-          Setting up the vault…
+          Opening the vault…
         </p>
       </div>
     );
@@ -89,15 +90,17 @@ export function WelcomePage() {
 
   if (status === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-precious-bg">
-        <div className="precious-card p-10 max-w-md w-full text-center space-y-4">
-          <div className="text-5xl mb-2">💎</div>
-          <h2 className="font-display text-2xl text-precious-gold gold-glow">
-            Key added to the vault
+      <div className="min-h-screen flex items-center justify-center bg-precious-bg p-4">
+        <div className="vault-card p-10 max-w-md w-full text-center space-y-4">
+          <div className="mx-auto text-precious-gold">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4z" />
+            </svg>
+          </div>
+          <h2 className="font-display text-2xl text-precious-gold-bright gold-glow">
+            Secret sealed
           </h2>
-          <p className="text-precious-muted text-sm">
-            Routing your first request…
-          </p>
+          <p className="text-precious-muted text-sm">Entering Sanctum…</p>
         </div>
       </div>
     );
@@ -105,25 +108,27 @@ export function WelcomePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-precious-bg p-4">
-      <div className="precious-card p-8 max-w-md w-full space-y-6">
+      <div className="vault-card p-8 max-w-md w-full space-y-6">
         <div className="text-center space-y-3">
-          <span className="text-4xl">💍</span>
-          <h1 className="font-display text-3xl font-semibold text-precious-gold gold-glow">
-            Precious
-          </h1>
-          <h2 className="font-display text-xl text-precious-muted">
+          <div className="flex justify-center">
+            <Logo href="/" />
+          </div>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-precious-gold/70">
+            Seal your first secret
+          </p>
+          <h2 className="font-display text-xl text-precious-gold-bright">
             One key to rule them all
           </h2>
           <p className="text-precious-muted text-sm max-w-xs mx-auto">
-            Add a provider API key to get started. Precious handles the rest
-            — routing, failover, and cost savings.
+            Encrypt a provider API key into the vault. Precious routes, failovers, and keeps your
+            conversation context intact.
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-precious-muted mb-1.5">
-              Provider
+            <label className="block text-xs font-medium text-precious-muted mb-1.5 uppercase tracking-wide">
+              Select archon (provider)
             </label>
             <select
               className="precious-input py-2 text-sm"
@@ -137,9 +142,10 @@ export function WelcomePage() {
                 <option
                   key={p.id}
                   value={p.id}
-                  style={{ background: '#0a1612', color: '#e8f0ec' }}
+                  style={{ background: '#0d1513', color: '#dce4e0' }}
                 >
-                  {p.name}{p.freeTier === false ? ' (paid)' : ''}
+                  {p.name}
+                  {p.freeTier === false ? ' (paid)' : ''}
                 </option>
               ))}
             </select>
@@ -147,15 +153,15 @@ export function WelcomePage() {
 
           {selected && (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <RiskBadge level={selected.riskLevel} />
                 {selected.freeTier && (
-                  <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-precious-emerald/40 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-700/40">
                     Free tier
                   </span>
                 )}
                 {selected.keyless && (
-                  <span className="text-xs bg-precious-gold/20 text-precious-gold px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-precious-gold/15 text-precious-gold px-2 py-0.5 rounded-full border border-precious-gold/30">
                     No key needed
                   </span>
                 )}
@@ -176,8 +182,8 @@ export function WelcomePage() {
 
           {needsKey && (
             <div>
-              <label className="block text-xs font-medium text-precious-muted mb-1.5">
-                API key
+              <label className="block text-xs font-medium text-precious-muted mb-1.5 uppercase tracking-wide">
+                Secret key
               </label>
               <input
                 type="password"
@@ -197,9 +203,8 @@ export function WelcomePage() {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-precious-muted mb-1.5">
-              Label{' '}
-              <span className="text-precious-muted/50">(optional)</span>
+            <label className="block text-xs font-medium text-precious-muted mb-1.5 uppercase tracking-wide">
+              Key alias <span className="text-precious-muted/50">(optional)</span>
             </label>
             <input
               type="text"
@@ -210,9 +215,7 @@ export function WelcomePage() {
             />
           </div>
 
-          {status === 'error' && (
-            <p className="text-xs text-red-400">{errorMsg}</p>
-          )}
+          {status === 'error' && <p className="text-xs text-red-400">{errorMsg}</p>}
 
           <button
             type="button"
@@ -222,18 +225,18 @@ export function WelcomePage() {
           >
             {status === 'loading' ? (
               <span className="flex items-center gap-2">
-                <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                Verifying key…
+                <span className="animate-spin h-4 w-4 border-2 border-precious-gold/30 border-t-precious-gold rounded-full" />
+                Sealing…
               </span>
             ) : selected?.keyless ? (
-              `Add ${selected.name}`
+              `Seal ${selected.name}`
             ) : (
-              `Add ${selected?.name ?? 'Provider'} key`
+              'Seal to vault'
             )}
           </button>
 
           <p className="text-[11px] text-precious-muted/60 text-center">
-            Keys are encrypted at rest. You can add more providers and models later.
+            Keys are encrypted at rest. Add more providers in The Vault later.
           </p>
         </div>
       </div>

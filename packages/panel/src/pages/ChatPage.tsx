@@ -89,8 +89,8 @@ function ChatMessageList({
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <p className="text-center text-precious-muted italic py-20 font-display">
-        My precious tokens.
+      <p className="text-center text-precious-muted/80 italic py-20 font-display tracking-wide">
+        Whisper to the Vault…
       </p>
     );
   }
@@ -291,30 +291,36 @@ function ChatPanelInner({
 
   const composerPlaceholder = attachmentsEnabled
     ? attachmentCaps.images && attachmentCaps.documents
-      ? 'Ask anything… attach images or files with 📎'
+      ? 'Whisper to the Vault… attach images or files with +'
       : attachmentCaps.images
-        ? 'Ask anything… attach images with 📎 or Ctrl+V'
-        : 'Ask anything… attach CSV, PDF, or text files with 📎'
-    : 'Ask anything…';
+        ? 'Whisper to the Vault… attach images with + or Ctrl+V'
+        : 'Whisper to the Vault… attach CSV, PDF, or text files with +'
+    : 'Whisper to the Vault…';
 
   return (
     <>
       {failoverToast && <QuestBanner variant="warn">{failoverToast}</QuestBanner>}
 
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <h1 className="font-display text-2xl text-precious-gold">Chat</h1>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-precious-gold/70 mb-1">Sanctum</p>
+          <h1 className="font-display text-2xl text-precious-gold-bright gold-glow tracking-wide">
+            Chamber of Conversations
+          </h1>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap justify-end">
           <select
-            className="precious-input py-1.5 text-sm w-auto min-w-[12rem]"
+            className="precious-input py-1.5 text-sm w-auto min-w-[12rem] uppercase tracking-wide"
             value={selectedModel}
             onChange={(e) => onSelectedModelChange(e.target.value)}
-            style={{ color: '#e8f0ec' }}
+            style={{ color: '#dce4e0' }}
+            aria-label="Model"
           >
             {modelOptions.map((m) => (
               <option
                 key={modelSelectValue(m)}
                 value={modelSelectValue(m)}
-                style={{ background: '#0a1612', color: '#e8f0ec' }}
+                style={{ background: '#0d1513', color: '#dce4e0' }}
               >
                 {formatModelOptionLabel(m)}
               </option>
@@ -323,9 +329,11 @@ function ChatPanelInner({
         </div>
       </div>
 
-      <QuotaCapacityBar summary={quotaSummary} compact />
+      <div className="mb-4">
+        <QuotaCapacityBar summary={quotaSummary} compact />
+      </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-5 mb-4 precious-card p-4 scroll-smooth">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-5 mb-4 precious-card p-4 md:p-5 scroll-smooth">
         <MemoizedChatMessageList
           messages={messages}
           isLoading={isLoading}

@@ -52,11 +52,11 @@ export function ChatMessageBubble({
     return (
       <div className="group flex justify-end gap-2 items-end">
         {copyBtn}
-        <div className="max-w-[78%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm bg-emerald-700/50 text-precious-text shadow-sm space-y-2">
+        <div className="max-w-[78%] rounded-xl rounded-br-md px-4 py-2.5 text-sm bg-precious-surface-high/70 border border-precious-emerald/40 text-precious-text shadow-sm space-y-2">
           {imageAttachments.length > 0 && (
             <ul className="flex flex-wrap gap-2">
               {imageAttachments.map((a) => (
-                <li key={a.url} className="rounded-lg overflow-hidden border border-emerald-600/30">
+                <li key={a.url} className="rounded-lg overflow-hidden border border-precious-emerald/40">
                   <img src={a.url} alt={a.name ?? 'Attached image'} className="max-h-40 max-w-full object-cover" />
                 </li>
               ))}
@@ -67,9 +67,9 @@ export function ChatMessageBubble({
               {fileAttachments.map((a) => (
                 <li
                   key={a.url}
-                  className="text-xs text-precious-muted bg-emerald-950/40 rounded px-2 py-1 border border-emerald-800/40"
+                  className="text-xs text-precious-muted bg-precious-bg/60 rounded px-2 py-1 border border-precious-emerald/40"
                 >
-                  📄 {a.name ?? 'Attached file'}
+                  {a.name ?? 'Attached file'}
                 </li>
               ))}
             </ul>
@@ -77,12 +77,19 @@ export function ChatMessageBubble({
           {parsed.text.trim() ? (
             <p className="whitespace-pre-wrap break-words leading-relaxed">{parsed.text}</p>
           ) : null}
+          <p className="text-[9px] uppercase tracking-widest text-precious-muted/50 pt-1">Encrypted</p>
         </div>
         <span
-          className="shrink-0 w-7 h-7 rounded-full bg-emerald-800/80 border border-emerald-600/30 flex items-center justify-center text-[10px] font-display text-precious-gold"
+          className="shrink-0 w-8 h-8 rounded-full bg-precious-surface border border-precious-emerald/50 flex items-center justify-center text-precious-muted"
           aria-hidden
         >
-          You
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z"
+            />
+          </svg>
         </span>
       </div>
     );
@@ -91,20 +98,27 @@ export function ChatMessageBubble({
   return (
     <div className="group flex justify-start gap-2.5 items-start max-w-[92%]">
       <span
-        className="shrink-0 w-7 h-7 mt-0.5 rounded-full bg-precious-gold/15 border border-precious-gold/30 flex items-center justify-center text-xs"
+        className="shrink-0 w-8 h-8 mt-0.5 rounded-full bg-precious-gold/15 border border-precious-gold/40 flex items-center justify-center text-precious-gold"
         aria-hidden
         title="Assistant"
       >
-        ✦
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3z" />
+        </svg>
       </span>
       <div className="min-w-0 flex-1 space-y-1.5">
-        {displayMeta && (displayMeta.provider || displayMeta.model) && (
-          <ChatRouteMetaChip meta={displayMeta} />
-        )}
-        <div className="rounded-2xl rounded-tl-md px-4 py-3 text-sm bg-precious-surface/90 border border-emerald-900/50 text-precious-text shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-display text-xs tracking-[0.14em] uppercase text-precious-gold">
+            Emerald Oracle
+          </span>
+          {displayMeta && (displayMeta.provider || displayMeta.model) && (
+            <ChatRouteMetaChip meta={displayMeta} />
+          )}
+        </div>
+        <div className="rounded-xl rounded-tl-md px-4 py-3 text-sm bg-precious-emerald/25 border border-precious-emerald/50 text-precious-text shadow-sm backdrop-blur-sm">
           <MarkdownLite text={parsed.text} />
           {displayMeta?.tokens != null && !Number.isNaN(displayMeta.tokens) && (
-            <p className="mt-3 pt-2 border-t border-emerald-900/40 text-[11px] text-precious-muted">
+            <p className="mt-3 pt-2 border-t border-precious-emerald/40 text-[11px] text-precious-muted">
               {formatResponseMeta({ tokens: displayMeta.tokens })}
             </p>
           )}

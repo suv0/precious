@@ -3,7 +3,7 @@
 export const copy = {
   errors: {
     noProviderKeys:
-      'One does not simply forge a Ring with an empty vault. Add a provider key first.',
+      'One does not simply forge a Ring with an empty vault. Seal a provider key first.',
     tosRequired:
       'The vault will not open without your oath. Check the Terms box above — we insist.',
     cloudTrustRequired:
@@ -26,27 +26,32 @@ export const copy = {
       'Open a terminal and run: ollama pull llama3.2 (or any model name you want to use).',
       'Check it works: ollama list should show your model; the server listens on port 11434.',
       'In the form below — Label: anything (e.g. My Ollama). API key: ollama (any text; Ollama ignores it). Base URL: http://localhost:11434/v1 (include /v1).',
-      'In Chat, pick Custom · llama3.2 (or the exact name from ollama list). Model names are case-sensitive.',
+      'In Sanctum, pick Custom · llama3.2 (or the exact name from ollama list). Model names are case-sensitive.',
     ],
     ollamaBaseUrlHint:
       'Must end with /v1 — e.g. http://localhost:11434/v1. For LM Studio, use its “Local server” URL (often http://localhost:1234/v1).',
     ollamaApiKeyHint:
       'Not a real secret for local Ollama — type ollama so the field is filled. LM Studio often accepts lm-studio or any placeholder.',
+    sealTitle: 'Seal a new secret',
+    sealCta: 'Seal to vault',
+    oneKeyTitle: 'The One Key',
+    fallbackTitle: 'The Fallback Chain',
+    vaultCapacity: 'Vault capacity',
   },
   success: {
-    keyAdded: 'Key added. Keeping it safe, yesss.',
+    keyAdded: 'Secret sealed. The vault remembers.',
     keyReplaced: 'Key updated. The vault remembers your new secret.',
     unifiedGenerated:
-      'Your prec_ key is forged. Guard it — unlike certain hobbits, you only see it once.',
-    chainSaved: 'The fellowship order is set. Failover shall follow your command.',
+      'Your prec_ master key is forged. Guard it — you only see it once.',
+    chainSaved: 'Fallback order sealed. Failover shall follow your command.',
     healthCheck: 'All keys probed — see results below each row.',
     keyTest: (label: string) => `${label}: key is working.`,
   },
   warn: {
     unifiedNeedsKeys:
-      'A Ring without a bearer goes nowhere. Add at least one provider key so routing has someone to carry it.',
+      'A Ring without a bearer goes nowhere. Seal at least one provider key so routing has someone to carry it.',
     chatNoKeys:
-      'No keys in the vault — chat cannot leave the Shire until you add one in Keys & routing.',
+      'No keys in the vault — Sanctum stays quiet until you seal one in The Vault.',
   },
   failover:
     '{from} limit reached — continued on {to} with your full conversation. Second breakfast? Second provider.',
@@ -96,7 +101,7 @@ export function mapApiError(message: string, code?: string): string {
   }
   if (message.includes('No models configured')) return copy.warn.chatNoKeys;
   if (message.includes('401') || message.includes('shall not pass')) {
-    return 'You shall not pass… without a valid API key. Add keys in Settings.';
+    return 'You shall not pass… without a valid API key. Seal keys in The Vault.';
   }
   try {
     const parsed = JSON.parse(message) as { error?: { message?: string } };

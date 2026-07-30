@@ -32,7 +32,7 @@ export function ChatComposer({
   isLoading,
   attachmentCapabilities,
   attachmentsHint,
-  placeholder = 'Ask anything…',
+  placeholder = 'Whisper to the Vault…',
 }: ChatComposerProps) {
   const attachmentsEnabled =
     attachmentCapabilities.images || attachmentCapabilities.documents;
@@ -216,7 +216,11 @@ export function ChatComposer({
 
       {rejectHint && <p className="text-[11px] text-amber-300/90">{rejectHint}</p>}
 
-      <form ref={formRef} onSubmit={handleFormSubmit} className="flex gap-2 items-end">
+      <form
+        ref={formRef}
+        onSubmit={handleFormSubmit}
+        className="flex gap-2 items-end rounded-2xl border border-precious-emerald/50 bg-precious-surface/70 backdrop-blur-md px-2 py-2 shadow-lg shadow-black/20"
+      >
         {attachmentsEnabled && (
           <>
             <input
@@ -236,22 +240,22 @@ export function ChatComposer({
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}
                 disabled={isLoading}
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-900/60 bg-precious-bg/80 text-precious-muted hover:text-precious-gold hover:border-emerald-700/60 transition-colors text-base leading-none"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-precious-emerald/50 bg-precious-bg/70 text-precious-gold hover:border-precious-gold/50 transition-colors text-lg leading-none"
                 aria-label="Attach file or image"
                 aria-expanded={menuOpen}
                 title="Attach file or image"
               >
-                📎
+                +
               </button>
               {menuOpen && (
                 <div
-                  className="absolute bottom-full left-0 mb-1 min-w-[11rem] rounded-lg border border-emerald-900/60 bg-precious-surface shadow-lg py-1 z-20"
+                  className="absolute bottom-full left-0 mb-1 min-w-[11rem] rounded-lg border border-precious-emerald/50 bg-precious-surface shadow-lg py-1 z-20"
                   role="menu"
                 >
                   <button
                     type="button"
                     role="menuitem"
-                    className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
+                    className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-precious-emerald/30"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {attachmentCapabilities.documents ? 'Upload file…' : 'Upload image…'}
@@ -260,13 +264,13 @@ export function ChatComposer({
                     <button
                       type="button"
                       role="menuitem"
-                      className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-emerald-950/50"
+                      className="w-full text-left px-3 py-2 text-sm text-precious-text hover:bg-precious-emerald/30"
                       onClick={pasteScreenshot}
                     >
                       Paste screenshot
                     </button>
                   )}
-                  <p className="px-3 py-1.5 text-[10px] text-precious-muted border-t border-emerald-900/40 leading-relaxed">
+                  <p className="px-3 py-1.5 text-[10px] text-precious-muted border-t border-precious-emerald/40 leading-relaxed">
                     {attachmentCapabilities.images ? 'Ctrl+V for screenshots. ' : ''}
                     {attachmentCapabilities.documents ? 'CSV, TXT, PDF supported.' : ''}
                   </p>
@@ -279,7 +283,7 @@ export function ChatComposer({
         <textarea
           ref={textareaRef}
           rows={1}
-          className="flex-1 min-w-0 resize-none rounded-lg border border-emerald-900/60 bg-precious-bg/80 px-3 py-2.5 text-sm text-precious-text placeholder:text-precious-muted focus:outline-none focus:border-emerald-700/70 max-h-32 overflow-y-auto"
+          className="flex-1 min-w-0 resize-none rounded-xl border-0 bg-transparent px-3 py-2.5 text-sm text-precious-text placeholder:text-precious-muted focus:outline-none max-h-32 overflow-y-auto"
           value={input}
           onChange={onInputChange}
           onKeyDown={onKeyDown}
@@ -291,14 +295,17 @@ export function ChatComposer({
 
         <button
           type="submit"
-          className="precious-btn-primary shrink-0 h-10 px-4"
+          className="shrink-0 h-11 w-11 rounded-xl bg-precious-gold text-precious-bg hover:bg-precious-gold-bright disabled:opacity-40 transition-colors flex items-center justify-center"
           disabled={!canSend}
+          aria-label="Send"
         >
-          Send
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 5l7 7-7 7" />
+          </svg>
         </button>
       </form>
-      <p className="text-[10px] text-precious-muted/80 leading-relaxed">
-        Enter to send · Shift+Enter for new line
+      <p className="text-[10px] text-precious-muted/70 leading-relaxed text-center uppercase tracking-[0.14em]">
+        Keys encrypted at rest · Enter to send
         {attachmentsEnabled ? ` · ${attachHelp}` : attachmentsHint ? ` · ${attachmentsHint}` : ''}
       </p>
     </div>

@@ -1,60 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --precious-bg: #0d1513;
+  --precious-surface: #112820;
   --precious-emerald: #0d3b2e;
   --precious-emerald-light: #1a5c45;
   --precious-gold: #d4a853;
+  --precious-gold-bright: #f2c36b;
   --precious-gold-dim: #a67c2e;
-  --precious-bg: #0a1612;
-  --precious-surface: #112820;
-  --precious-text: #e8f0ec;
+  --precious-text: #dce4e0;
   --precious-muted: #8aab9a;
 }
 
 body {
   @apply bg-precious-bg text-precious-text font-body antialiased;
   background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(26, 92, 69, 0.35) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(212, 168, 83, 0.08) 0%, transparent 40%);
+    radial-gradient(ellipse at 50% 30%, rgba(13, 59, 46, 0.45) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 100%, rgba(212, 168, 83, 0.06) 0%, transparent 40%);
   min-height: 100vh;
 }
-
-.font-display {
-  font-family: 'Cinzel', serif;
-}
-
-.font-body {
-  font-family: 'Source Sans 3', sans-serif;
-}
-
-.gold-glow {
-  text-shadow: 0 0 20px rgba(212, 168, 83, 0.4);
-}
-
-.precious-card {
-  @apply rounded-xl border border-emerald-900/60 bg-precious-surface/80 backdrop-blur-sm;
-}
-
-.precious-btn {
-  @apply inline-flex items-center justify-center rounded-lg px-5 py-2.5 font-medium transition-all;
-}
-
-.precious-btn-primary {
-  @apply precious-btn bg-gradient-to-r from-emerald-700 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-500 shadow-lg shadow-emerald-900/40;
-}
-
-.precious-btn-gold {
-  @apply precious-btn border border-precious-gold/50 text-precious-gold hover:bg-precious-gold/10;
-}
-
-.precious-input {
-  @apply w-full rounded-lg border border-emerald-800/60 bg-precious-bg/80 px-4 py-2.5 text-precious-text placeholder:text-precious-muted focus:border-precious-gold/50 focus:outline-none focus:ring-1 focus:ring-precious-gold/30;
-}
-
-.risk-low { @apply bg-emerald-900/50 text-emerald-300 border-emerald-700; }
-.risk-medium { @apply bg-amber-900/40 text-amber-200 border-amber-700; }
-.risk-high { @apply bg-red-900/40 text-red-200 border-red-700; }

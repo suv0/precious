@@ -5,6 +5,12 @@ import { usePathname } from 'next/navigation';
 import { Logo } from './Logo';
 import { usePanelConfig } from '../config';
 
+const NAV = [
+  { href: '/chat', label: 'Sanctum' },
+  { href: '/settings/keys', label: 'The Vault' },
+  { href: '/settings/audit', label: 'Chronicles' },
+] as const;
+
 export function PanelHeader({
   sidebarToggle,
   showNav,
@@ -16,14 +22,12 @@ export function PanelHeader({
   const { requireAuth, loginHref, showDocsLink } = usePanelConfig();
 
   const nav = [
-    { href: '/chat', label: 'Chat' },
-    { href: '/settings/keys', label: 'Keys' },
-    { href: '/settings/audit', label: 'Audit' },
+    ...NAV,
     ...(showDocsLink ? [{ href: '/docs', label: 'Docs' }] : []),
   ];
 
   return (
-    <header className="border-b border-emerald-900/40 px-4 py-3 lg:px-6 lg:py-4">
+    <header className="border-b border-precious-emerald/40 px-4 py-3 lg:px-6 lg:py-4 bg-precious-bg/60 backdrop-blur-md">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {sidebarToggle && (
@@ -42,20 +46,23 @@ export function PanelHeader({
         </div>
         <div className="flex items-center gap-6">
           {showNav && (
-            <nav className="flex items-center gap-4">
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`text-sm transition-colors ${
-                    pathname.startsWith(item.href)
-                      ? 'text-precious-gold'
-                      : 'text-precious-muted hover:text-precious-text'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            <nav className="hidden sm:flex items-center gap-5">
+              {nav.map((item) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`text-sm tracking-wide transition-colors ${
+                      active
+                        ? 'nav-active font-semibold'
+                        : 'text-precious-muted hover:text-precious-text'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
           {requireAuth && loginHref && (

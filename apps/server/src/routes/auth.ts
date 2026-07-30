@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { Hono } from 'hono';
 import { setCookie, deleteCookie, getCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
@@ -49,7 +50,9 @@ auth.post('/login', async (c) => {
   const body = await c.req.json<{ password: string }>();
   const expected = process.env.PRECIOUS_LOCAL_PASSWORD!.trim();
 
-  if (body.password !== expected) {
+  const expectedBuf = Buffer.from(expected);
+  const actualBuf = Buffer.from(body.password);
+  if (actualBuf.length !== expectedBuf.length || !timingSafeEqual(actualBuf, expectedBuf)) {
     return c.json({ error: 'Invalid password' }, 401);
   }
 

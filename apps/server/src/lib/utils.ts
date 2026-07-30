@@ -44,3 +44,39 @@ export const SESSION_COOKIE = 'precious_session';
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export { eq, and };
+
+export function validateCustomBaseUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return 'Invalid base URL. Must be a valid HTTPS URL (e.g. https://api.example.com/v1).';
+  }
+
+  if (url.pathname && !url.pathname.endsWith('/')) {
+    url.pathname = url.pathname + '/';
+  }
+
+  const hostname = url.hostname.toLowerCase();
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return null;
+    }
+    return 'Localhost base URLs must use http:// or https://.';
+  }
+
+  if (url.protocol !== 'https:') {
+    return 'Base URL must use HTTPS. Only localhost (http://localhost:*) is allowed without TLS.';
+  }
+
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return 'IP addresses are not allowed in base URLs. Use a hostname.';
+  }
+
+  return null;
+}

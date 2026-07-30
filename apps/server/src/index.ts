@@ -106,16 +106,19 @@ async function main() {
     app.get('/', (c) => c.redirect('/settings/keys'));
   }
 
+  const host = process.env.HOST ?? '127.0.0.1';
+
   console.log(`
   ╔═══════════════════════════════════════╗
   ║           💎 Precious Local           ║
   ║   One key to rule them all.           ║
   ╚═══════════════════════════════════════╝
   API + Panel: http://localhost:${port}
+  Bind: ${host}:${port}
   Mode: local (SQLite @ ${DB_PATH})
   `);
 
-  serve({ fetch: app.fetch, port });
+  serve({ fetch: app.fetch, port, hostname: host });
 }
 
 main().catch(console.error);

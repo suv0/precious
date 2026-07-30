@@ -12,7 +12,7 @@ import {
   keyUsageCounters,
   auditLog,
 } from '../db/schema.js';
-import { logAudit } from '../lib/utils.js';
+import { logAudit, validateCustomBaseUrl } from '../lib/utils.js';
 import { ensureFallbackChainForKeys } from '../lib/fallback-chain.js';
 import { localApiAuth, type AppVariables } from '../middleware/auth.js';
 
@@ -151,6 +151,12 @@ keys.post('/', async (c) => {
     await patchUserSettings(userId, { cloudTrustAcknowledged: true });
   }
 
+  const customBaseUrl = body.customBaseUrl?.trim() || null;
+  if (customBaseUrl) {
+    const err = validateCustomBaseUrl(customBaseUrl);
+    if (err) return c.json({ error: err, code: 'invalid_base_url' }, 400);
+  }
+
   const id = uuidv4();
   const encryptedKey = encrypt(apiKey, encryptionKey);
 
@@ -160,7 +166,7 @@ keys.post('/', async (c) => {
     providerId: body.providerId,
     label,
     encryptedKey,
-    customBaseUrl: body.customBaseUrl?.trim() || null,
+    customBaseUrl,
     healthStatus: 'unknown',
     createdAt: new Date(),
   });
@@ -250,7 +256,12 @@ keys.patch('/:id', async (c) => {
 
   if (body.label !== undefined) patch.label = body.label.trim() || existing.label;
   if (body.customBaseUrl !== undefined) {
-    patch.customBaseUrl = body.customBaseUrl?.trim() || null;
+    const trimmed = body.customBaseUrl?.trim() || null;
+    if (trimmed) {
+      const urlErr = validateCustomBaseUrl(trimmed);
+      if (urlErr) return c.json({ error: urlErr, code: 'invalid_base_url' }, 400);
+    }
+    patch.customBaseUrl = trimmed;
   }
 
   await db.update(providerKeys).set(patch).where(eq(providerKeys.id, id));

@@ -1,6 +1,7 @@
 export * from './types.js';
 export * from './encryption.js';
 export * from './api-keys.js';
+export { UNIFIED_KEY_PREFIX } from './api-keys.js';
 export * from './rate-limit.js';
 export * from './per-key-rate.js';
 export * from './key-health.js';

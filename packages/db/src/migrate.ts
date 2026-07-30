@@ -90,6 +90,7 @@ export const MIGRATION_SQL = `
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_chat_messages_lookup ON chat_messages (user_id, conversation_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_unified_keys_prefix ON unified_api_keys (key_prefix);
 `;
 
 const LEGACY_ALTERS = [

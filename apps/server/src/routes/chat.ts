@@ -369,7 +369,7 @@ async function handleChat(
           const title = firstContent.trim().length > 50
             ? firstContent.trim().slice(0, 47) + '...'
             : firstContent.trim();
-          await updateConversationMeta(conversationId, { title });
+          await updateConversationMeta(userId, conversationId, { title });
         }
       }
     }
@@ -583,22 +583,25 @@ async function handleChat(
     if (usedKeyId) {
       await updateKeyHealth(db, usedKeyId, healthFromError(err));
     }
-    const message = err instanceof Error ? err.message : 'Routing failed';
+    const fullMessage = err instanceof Error ? err.message : 'Routing failed';
+    const clientMessage = fullMessage.includes('All providers exhausted')
+      ? fullMessage
+      : 'Routing failed — check the audit log for details.';
 
     // Clean up orphan conversation created for this request
     if (createdConversationId) {
-      try { await deleteConversation(createdConversationId); } catch { /* best effort */ }
+      try { await deleteConversation(userId, createdConversationId); } catch { /* best effort */ }
     }
 
     await logAudit(db, userId, 'chat_request', {
       metadata: {
-        error: message,
+        error: fullMessage,
         model: requestBody.model,
         stream: wantsStream,
         usedKeyId: usedKeyId ?? null,
       },
     });
-    return c.json({ error: { message, type: 'api_error' } }, 502);
+    return c.json({ error: { message: clientMessage, type: 'api_error' } }, 502);
   }
 }
 
@@ -698,17 +701,19 @@ chatSession.post('/conversations', localApiAuth, async (c) => {
   return c.json({ conversation: entry });
 });
 chatSession.delete('/conversations/:id', localApiAuth, async (c) => {
+  const userId = c.get('userId');
   const id = c.req.param('id');
   if (!id) return c.json({ error: 'id required' }, 400);
-  await deleteConversation(id);
+  await deleteConversation(userId, id);
   return c.json({ ok: true });
 });
 chatSession.patch('/conversations/:id', localApiAuth, async (c) => {
+  const userId = c.get('userId');
   const id = c.req.param('id');
   if (!id) return c.json({ error: 'id required' }, 400);
   const { title } = await c.req.json<{ title?: string }>();
   if (title !== undefined) {
-    await updateConversationMeta(id, { title });
+    await updateConversationMeta(userId, id, { title });
   }
   return c.json({ ok: true });
 });

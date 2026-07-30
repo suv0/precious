@@ -430,7 +430,7 @@ export class Router {
             }
 
             const msg = err instanceof Error ? err.message : String(err);
-            errors.push(`${entry.providerId}/${model}: ${msg}`);
+            errors.push(`${entry.providerId}/${model}: ${msg.slice(0, 80)}`);
             trail.push({ provider: entry.providerId, model, result: 'error', error: msg.slice(0, 120) });
 
             if (this.shouldRetry(err)) {

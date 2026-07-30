@@ -92,6 +92,7 @@ export async function createConversation(
 }
 
 export async function updateConversationMeta(
+  userId: string,
   conversationId: string,
   data: { title?: string; model?: string; provider?: string },
 ): Promise<void> {
@@ -104,13 +105,17 @@ export async function updateConversationMeta(
       ...(data.provider !== undefined ? { provider: data.provider } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(conversations.id, conversationId));
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
 }
 
-export async function deleteConversation(conversationId: string): Promise<void> {
+export async function deleteConversation(userId: string, conversationId: string): Promise<void> {
   const db = getDb();
-  await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
-  await db.delete(conversations).where(eq(conversations.id, conversationId));
+  await db
+    .delete(chatMessages)
+    .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.userId, userId)));
+  await db
+    .delete(conversations)
+    .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)));
 }
 
 function parseStoredContent(raw: string): ChatMessage['content'] {

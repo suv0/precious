@@ -95,14 +95,30 @@ export async function unifiedKeyAuth(c: Context, next: Next) {
   }
 
   const apiKey = authHeader.slice(7);
-  const { verifyUnifiedApiKey } = await import('@precious/core');
+  const { verifyUnifiedApiKey, UNIFIED_KEY_PREFIX } = await import('@precious/core');
   const db = getDb();
   const { unifiedApiKeys } = await import('../db/schema.js');
 
-  const keys = await db.select().from(unifiedApiKeys);
-  let matchedUserId: string | null = null;
+  if (!apiKey.startsWith(UNIFIED_KEY_PREFIX)) {
+    return c.json(
+      {
+        error: {
+          message: 'You shall not pass… without a valid API key.',
+          type: 'invalid_request_error',
+        },
+      },
+      401,
+    );
+  }
 
-  for (const record of keys) {
+  const keyPrefix = apiKey.slice(0, 12);
+  const candidates = await db
+    .select()
+    .from(unifiedApiKeys)
+    .where(eq(unifiedApiKeys.keyPrefix, keyPrefix));
+
+  let matchedUserId: string | null = null;
+  for (const record of candidates) {
     if (verifyUnifiedApiKey(apiKey, record.keyHash)) {
       matchedUserId = record.userId;
       break;

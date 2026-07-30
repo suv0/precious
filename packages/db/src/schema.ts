@@ -46,7 +46,9 @@ export const unifiedApiKeys = sqliteTable('unified_api_keys', {
   keyHash: text('key_hash').notNull(),
   keyPrefix: text('key_prefix').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-});
+}, (table) => ({
+  prefixIdx: index('idx_unified_keys_prefix').on(table.keyPrefix),
+}));
 
 export const fallbackChain = sqliteTable('fallback_chain', {
   id: text('id').primaryKey(),

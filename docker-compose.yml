@@ -9,6 +9,7 @@ services:
       - precious-data:/data
     environment:
       - PORT=3001
+      - HOST=0.0.0.0
       - NODE_ENV=production
       - DATA_DIR=/data
       - DATABASE_PATH=/data/precious.db

@@ -40,6 +40,11 @@ You (Browser / API) ──▶ Precious ──▶ Groq (rate limited? → cooldow
 
 ## Quick start
 
+### Prerequisites
+
+- **Docker Desktop** (or Docker Engine + Docker Compose) — [download](https://docs.docker.com/get-docker/)
+- Or if you prefer without Docker: **Node.js 20+** — [download](https://nodejs.org/)
+
 ### Docker (recommended — no Node.js required)
 
 ```bash
@@ -152,6 +157,18 @@ Built with **Node.js 20+**, **Hono**, **React 19**, **Next.js 15**, **Drizzle OR
 - Custom provider URLs are validated to prevent SSRF
 
 For local use, Precious is designed to run on your machine, behind your firewall. If you need multi-user cloud hosting, **Precious Cloud** is available in a separate private deployment.
+
+---
+
+## Troubleshooting
+
+**"Could not connect to Docker daemon"** — Docker Desktop isn't running. Start it from your applications menu, or install from [docker.com](https://docs.docker.com/get-docker/).
+
+**"Port 3001 already in use"** — something else is on that port. Set `PORT=3002` in `docker-compose.yml` or run the local dev version with `PORT=3002 npm run dev:server`.
+
+**"Cannot find module '@precious/core'"** (local dev) — you need to build the dependencies first: `npm run build:core && npm run build:db && npm run build:providers`.
+
+**Wipe all data and start fresh:** `docker compose down -v && docker compose up -d`
 
 ---
 

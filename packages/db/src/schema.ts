@@ -22,7 +22,9 @@ export const providerKeys = sqliteTable('provider_keys', {
   healthStatus: text('health_status').default('unknown'),
   lastCheckedAt: integer('last_checked_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-});
+}, (table) => ({
+  userIdx: index('idx_provider_keys_user').on(table.userId),
+}));
 
 export const keyUsageCounters = sqliteTable('key_usage_counters', {
   providerKeyId: text('provider_key_id')
@@ -59,7 +61,9 @@ export const fallbackChain = sqliteTable('fallback_chain', {
   model: text('model').notNull(),
   priority: integer('priority').notNull(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
-});
+}, (table) => ({
+  userIdx: index('idx_fallback_chain_user').on(table.userId),
+}));
 
 export const settings = sqliteTable('settings', {
   userId: text('user_id')
@@ -83,7 +87,9 @@ export const auditLog = sqliteTable('audit_log', {
   resourceId: text('resource_id'),
   metadata: text('metadata'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-});
+}, (table) => ({
+  userTimeIdx: index('idx_audit_log_user_time').on(table.userId, table.createdAt),
+}));
 
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
@@ -104,7 +110,9 @@ export const conversations = sqliteTable('conversations', {
   provider: text('provider'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-});
+}, (table) => ({
+  userTimeIdx: index('idx_conversations_user_time').on(table.userId, table.updatedAt),
+}));
 
 export const chatMessages = sqliteTable('chat_messages', {
   id: text('id').primaryKey(),

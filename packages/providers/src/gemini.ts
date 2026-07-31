@@ -21,9 +21,9 @@ function geminiUrl(baseUrl: string | null | undefined): string {
   return `${resolveProviderBaseUrl(baseUrl, geminiConfig.defaultBaseUrl)}/chat/completions`;
 }
 
-function geminiEmbeddingUrl(baseUrl: string | null | undefined, model: string, apiKey: string): string {
+function geminiEmbeddingUrl(baseUrl: string | null | undefined, model: string): string {
   const base = resolveProviderBaseUrl(baseUrl, geminiConfig.defaultBaseUrl);
-  return `${base.replace('/openai', '')}/models/${model}:embedContent?key=${encodeURIComponent(apiKey)}`;
+  return `${base.replace('/openai', '')}/models/${model}:embedContent`;
 }
 
 export const geminiAdapter: ProviderAdapter = {
@@ -100,14 +100,17 @@ export const geminiAdapter: ProviderAdapter = {
   },
 
   async embedding(apiKey, model, request, baseUrl) {
-    const url = geminiEmbeddingUrl(baseUrl, model, apiKey);
+    const url = geminiEmbeddingUrl(baseUrl, model);
     const inputs = Array.isArray(request.input) ? request.input : [request.input];
 
     const allEmbeddings: Array<{ values: number[] }> = [];
     for (const text of inputs) {
       const res = await fetchWithTimeout(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify({
           model: `models/${model}`,
           content: { parts: [{ text }] },

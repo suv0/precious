@@ -91,6 +91,10 @@ export const MIGRATION_SQL = `
   );
   CREATE INDEX IF NOT EXISTS idx_chat_messages_lookup ON chat_messages (user_id, conversation_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_unified_keys_prefix ON unified_api_keys (key_prefix);
+  CREATE INDEX IF NOT EXISTS idx_provider_keys_user ON provider_keys (user_id);
+  CREATE INDEX IF NOT EXISTS idx_fallback_chain_user ON fallback_chain (user_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_log_user_time ON audit_log (user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_conversations_user_time ON conversations (user_id, updated_at DESC);
 `;
 
 const LEGACY_ALTERS = [

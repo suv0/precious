@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="360" viewBox="0 0 760 360" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>Precious: Groq hits a rate limit, Precious fails over to Gemini, and the conversation carries on</title>
+  <!-- One 16-second loop:
+       0-1s idle, 1-2.5s you send, 2.5-5s Groq tries, 5-7s rate limited, 7-9s Gemini tries, 9-16s answer. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1F18"/>
+      <stop offset="1" stop-color="#121A14"/>
+    </linearGradient>
+  </defs>
+
+  <!-- the panel window -->
+  <rect x="0" y="0" width="760" height="360" rx="18" fill="url(#bg)"/>
+  <rect x="24" y="20" width="712" height="282" rx="12" fill="#0F2A20" stroke="#1F4A3A"/>
+  <circle cx="50" cy="44" r="8" fill="none" stroke="#C8D3F5" stroke-width="2.5"/>
+  <circle cx="50" cy="35" r="3" fill="#8FB8FF"/>
+  <text x="66" y="50" fill="#D4A24C" font-size="17" font-weight="bold" font-family="Georgia, 'Times New Roman', serif">Precious</text>
+  <rect x="516" y="30" width="196" height="28" rx="6" fill="#0B1F18" stroke="#1F4A3A"/>
+  <text x="530" y="49" fill="#DCE4E0" font-size="13">Auto (best available)</text>
+  <path d="M696 41 l4 4 l4 -4" fill="none" stroke="#DCE4E0" stroke-width="1.5"/>
+
+  <!-- the conversation so far -->
+  <g font-size="14">
+    <rect x="452" y="74" width="260" height="30" rx="15" fill="#0E8F63"/>
+    <text x="582" y="94" fill="#FFFFFF" text-anchor="middle">Draft a reply to my landlord.</text>
+    <rect x="48" y="112" width="300" height="30" rx="15" fill="#16382B"/>
+    <text x="64" y="132" fill="#DCE4E0">Done. Want it shorter or more formal?</text>
+  </g>
+
+  <!-- your new message -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1" keyTimes="0;0.07"/>
+    <rect x="472" y="150" width="240" height="30" rx="15" fill="#0E8F63"/>
+    <text x="592" y="170" fill="#FFFFFF" font-size="14" text-anchor="middle">Shorter, and keep it polite.</text>
+  </g>
+
+  <!-- the answer, after failover -->
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1" keyTimes="0;0.57"/>
+    <rect x="48" y="188" width="352" height="30" rx="15" fill="#16382B"/>
+    <text x="64" y="208" fill="#DCE4E0" font-size="14">Here’s a short, polite version you can send.</text>
+    <text x="412" y="208" fill="#8FA89C" font-size="12">via Gemini · whole chat carried over</text>
+  </g>
+
+  <!-- the routing chain -->
+  <line x1="24" y1="230" x2="736" y2="230" stroke="#1F4A3A"/>
+  <text x="48" y="256" fill="#8FA89C" font-size="12" letter-spacing="1">FALLBACK CHAIN</text>
+
+  <!-- Groq: tries, then rate limited -->
+  <rect x="184" y="240" width="140" height="32" rx="16" fill="#0B1F18" stroke="#1F4A3A">
+    <animate attributeName="stroke" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="#1F4A3A;#D4A24C;#E5484D" keyTimes="0;0.16;0.31"/>
+  </rect>
+  <text x="254" y="261" fill="#DCE4E0" font-size="14" text-anchor="middle">Groq
+    <animate attributeName="fill" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="#DCE4E0;#6E8279" keyTimes="0;0.31"/>
+  </text>
+  <line x1="230" y1="256" x2="278" y2="256" stroke="#E5484D" stroke-width="1.5" opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1" keyTimes="0;0.31"/>
+  </line>
+  <text x="254" y="290" fill="#E5484D" font-size="12" text-anchor="middle" opacity="0">429 rate limited · cooling down
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1" keyTimes="0;0.31"/>
+  </text>
+
+  <text x="346" y="261" fill="#4E6B5E" font-size="16" text-anchor="middle">→
+    <animate attributeName="fill" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="#4E6B5E;#D4A24C" keyTimes="0;0.38"/>
+  </text>
+
+  <!-- Gemini: tries, then answers -->
+  <rect x="368" y="240" width="140" height="32" rx="16" fill="#0B1F18" stroke="#1F4A3A">
+    <animate attributeName="stroke" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="#1F4A3A;#D4A24C;#22A06B" keyTimes="0;0.44;0.56"/>
+    <animate attributeName="fill" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="#0B1F18;#0E3A2A" keyTimes="0;0.56"/>
+  </rect>
+  <text x="438" y="261" fill="#DCE4E0" font-size="14" text-anchor="middle">Gemini</text>
+  <text x="438" y="290" fill="#22A06B" font-size="12" text-anchor="middle" opacity="0">200 OK · same context
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1" keyTimes="0;0.56"/>
+  </text>
+
+  <text x="530" y="261" fill="#4E6B5E" font-size="16" text-anchor="middle">→</text>
+  <rect x="552" y="240" width="140" height="32" rx="16" fill="#0B1F18" stroke="#1F4A3A"/>
+  <text x="622" y="261" fill="#8FA89C" font-size="14" text-anchor="middle">OpenRouter</text>
+
+  <!-- the trying dot moves along the chain -->
+  <circle cx="0" cy="256" r="5" fill="#D4A24C" opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="0;1;0" keyTimes="0;0.16;0.56"/>
+    <animate attributeName="cx" dur="16s" repeatCount="indefinite" calcMode="discrete"
+             values="198;382" keyTimes="0;0.44"/>
+    <animate attributeName="r" values="4;6;4" dur="0.8s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- the promise -->
+  <rect x="24" y="318" width="54" height="24" rx="6" fill="#0F2A20" stroke="#D4A24C"/>
+  <text x="51" y="335" fill="#D4A24C" font-size="13" text-anchor="middle" font-family="Consolas, Menlo, monospace">prec_</text>
+  <text x="90" y="335" fill="#8FA89C" font-size="14">One key for Cursor, Python, LangChain or any OpenAI client. Your keys stay yours.</text>
+</svg>

@@ -10,8 +10,6 @@
 [![Self-hosted](https://img.shields.io/badge/keys-on%20your%20server-22A06B?style=for-the-badge&logo=lock&logoColor=white)](#security)
 [![MIT](https://img.shields.io/badge/license-MIT-64748B?style=for-the-badge)](LICENSE)
 
-[![CI](https://github.com/suv0/precious/actions/workflows/ci.yml/badge.svg)](https://github.com/suv0/precious/actions/workflows/ci.yml)
-
 **Add your own keys. When one provider runs out, Precious switches to the next, and the conversation carries on.**
 
 <img src="docs/demo.svg" width="760" alt="Precious in action: Groq hits a 429 rate limit, Precious fails over to Gemini, and the answer arrives with the whole chat carried over"/>

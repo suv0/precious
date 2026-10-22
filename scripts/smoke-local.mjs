@@ -80,9 +80,20 @@ async function main() {
     if (count < 5) throw new Error(`expected 5 providers, got ${count}`);
     console.log(`✓ /api/keys/providers (${count} providers)`);
 
+    // A unified key needs at least one provider key first. Adding one does not call the provider.
+    const providerKey = await fetchJson('/api/keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId: 'groq', label: 'Smoke test', apiKey: 'smoke-test-not-a-real-key' }),
+    });
+    if (providerKey.status !== 200) {
+      throw new Error(`provider key add failed: ${providerKey.status} ${JSON.stringify(providerKey.body)}`);
+    }
+    console.log('✓ provider key added');
+
     const unified = await fetchJson('/api/keys/unified', { method: 'POST' });
     if (unified.status !== 200 || !unified.body?.key?.startsWith('prec_')) {
-      throw new Error('unified key generation failed');
+      throw new Error(`unified key generation failed: ${unified.status} ${JSON.stringify(unified.body)}`);
     }
     const apiKey = unified.body.key;
     console.log('✓ unified prec_ key generated');

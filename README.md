@@ -1,4 +1,22 @@
-# 💍 Precious
+<div align="center">
+
+<img src="https://capsule-render.vercel.app/api?type=waving&height=200&color=0:0B1F18,100:0E8F63&text=Precious&fontColor=D4A24C&fontSize=72&fontAlignY=36&desc=One%20key%20to%20rule%20them%20all&descSize=20&descAlignY=58&animation=fadeIn" width="100%" alt="Precious"/>
+
+[![What Precious does](https://readme-typing-svg.demolab.com?font=Fira+Code&size=20&pause=1100&color=D4A24C&center=true&vCenter=true&width=640&lines=Groq+rate+limited%3F+Next+provider.;Gemini+%E2%86%92+OpenRouter+%E2%86%92+Mistral...;The+whole+chat+comes+along.;One+prec_+key+for+everything.)](#how-it-works)
+
+[![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?style=for-the-badge&logo=docker&logoColor=white)](#quick-start)
+[![Node 20+](https://img.shields.io/badge/Node-20%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#quick-start)
+[![17 providers](https://img.shields.io/badge/providers-17-D4A24C?style=for-the-badge)](#supported-providers-17-adapters)
+[![Self-hosted](https://img.shields.io/badge/keys-on%20your%20server-22A06B?style=for-the-badge&logo=lock&logoColor=white)](#security)
+[![MIT](https://img.shields.io/badge/license-MIT-64748B?style=for-the-badge)](LICENSE)
+
+**Add your own keys. When one provider runs out, Precious switches to the next, and the conversation carries on.**
+
+<img src="docs/demo.svg" width="760" alt="Precious in action: Groq hits a 429 rate limit, Precious fails over to Gemini, and the answer arrives with the whole chat carried over"/>
+
+</div>
+
+## 💍 Precious
 
 > **One key to rule them all.**
 > *Every LLM. Your keys. Our router.*
